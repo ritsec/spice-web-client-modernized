@@ -13,6 +13,8 @@ suite('Application', function() {
 		fakeClientGui['addListener'] = function() {};
 		fakeClientGui['releaseAllKeys'] = function() {};
 		fakeClientGui['setClipBoardData'] = function() {};
+		fakeClientGui['enableKeyboard'] = function() {};
+		fakeClientGui['disableKeyboard'] = function() {};
 		clientGuiMock = sinon.mock(fakeClientGui);
 		fakeBusProcess = {addListener: function() {}};
 		fakeBusConnection = {disconnect: function() {}, addListener: function() {}};

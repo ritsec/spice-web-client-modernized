@@ -19,8 +19,8 @@ suite('ConnectionControl', function() {
 	});
 
 	test('connect should call socket connect with uri', function() {
-		var expectedString = config['protocol'] + '://' + config['host'] + ':' + config['port'] +
-            '/websockify/destInfoToken/' + config['heartbeatToken']+'/type/raw';
+		var expectedString = config['protocol'] + '://' + config['host'] + ':' + document.location.port +
+            '/?ver=2&token=' + config['port'];
 		var mock = sinon.mock(socket);
 		var expectation = mock.expects('connect').once().withArgs(expectedString);
 		sut.connect(config);

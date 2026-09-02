@@ -1,4 +1,4 @@
-suite('DisplayProcess', function() {
+suite('DisplayRouter', function() {
 	var sut;
 
 	setup(function(){

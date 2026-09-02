@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!--
+ Test harness page for the Spice Web Client unit tests.
+
+   1. vendored test libraries (chai, sinon)          -> unittest/vendor/
+   2. the runner core (defines suite/setup/teardown/test) -> unittest/runner.js
+   3. the application scripts in the same order as index.html (minus run.js,
+      which would try to start a real SPICE session)
+   4. the graphic-test data URI list                  -> unittest/graphictestfiles/uris.js
+   5. every unittest/*.test.js file
+   6. an inline call to window.wdiTestRun() that executes the registered tests
+
+ The runner then publishes the result in window.__wdi_test_results.
+ tools/run-tests.mjs drives this page headlessly.
+
+ Open this page directly (serving the repository root, e.g. `npm run serve`)
+ for an in-browser run with a human-readable console report.
+
+ -->
+<html>
+    <head>
+        <title>Spice Web Client - Unit Tests</title>
+        <meta charset="utf-8">
+
+        <!-- test libraries -->
+        <script src="vendor/chai-3.5.0.min.js"></script>
+        <script src="vendor/sinon-1.17.7.js"></script>
+        <!-- test runner core: defines suite/setup/teardown/test; must load before the tests -->
+        <script src="runner.js"></script>
+
+        <!-- libs (same order as ../index.html) -->
+        <script src="../lib/modernizr.js"></script>
+        <script src="../lib/jquery-2.0.3.js"></script>
+        <script src="../lib/jquery-mousewheel.js"></script>
+        <script src="../lib/jgestures.min.js"></script>
+        <script src="../lib/pixastic.js"></script>
+        <script src="../lib/base64.js"></script>
+        <script src="../lib/biginteger.js"></script>
+        <script src="../lib/virtualjoystick.js"></script>
+        <script src="../lib/prettyprint.js"></script>
+        <script src="../lib/jquery.nok.min.js"></script>
+        <!-- ticketing -->
+        <script src="../lib/jsbn.js"></script>
+        <script src="../lib/jsbn2.js"></script>
+        <script src="../lib/prng4.js"></script>
+        <script src="../lib/rng.js"></script>
+        <script src="../lib/sha1.js"></script>
+        <script src="../lib/encrypt.js"></script>
+        <!-- end libs -->
+        <!-- core -->
+        <script src="../swcanvas/swcanvas.js"></script>
+        <script src="../lib/bowser.js"></script>
+        <script src="../lib/utils.js"></script>
+        <script src="../lib/flipper.js"></script>
+        <script src="../lib/CollisionDetector.js"></script>
+        <script src="../lib/GlobalPool.js"></script>
+        <script src="../lib/GenericObjectPool.js"></script>
+        <script src="../lib/AsyncConsumer.js"></script>
+        <script src="../lib/AsyncWorker.js"></script>
+        <script src="../lib/PacketWorkerIdentifier.js"></script>
+        <script src="../spiceobjects/spiceobjects.js"></script>
+        <script src="../spiceobjects/generated/protocol.js"></script>
+        <script src="../lib/graphicdebug.js"></script>
+        <script src="../lib/images/lz.js"></script>
+        <script src="../lib/images/bitmap.js"></script>
+        <script src="../lib/images/png.js"></script>
+        <script src="../lib/runqueue.js"></script>
+        <script src="../lib/graphic.js"></script>
+        <script src="../lib/queue.js"></script>
+        <script src="../lib/ImageUncompressor.js"></script>
+        <script src="../lib/SyncAsyncHandler.js"></script>
+        <script src="../lib/IntegrationBenchmark.js"></script>
+        <script src="../lib/stuckkeyshandler.js"></script>
+        <script src="../lib/timelapsedetector.js"></script>
+        <script src="../lib/displayRouter.js"></script>
+        <script src="../lib/rasterEngine.js"></script>
+        <script src="../lib/DataLogger.js"></script>
+        <script src="../network/socket.js"></script>
+        <script src="../network/clusternodechooser.js"></script>
+        <script src="../network/socketqueue.js"></script>
+        <script src="../network/packetcontroller.js"></script>
+        <script src="../network/packetextractor.js"></script>
+        <script src="../network/packetreassembler.js"></script>
+        <script src="../network/reassemblerfactory.js"></script>
+        <script src="../network/sizedefiner.js"></script>
+        <script src="../network/packetlinkfactory.js"></script>
+        <script src="../network/spicechannel.js"></script>
+        <script src="../network/busconnection.js"></script>
+        <script src="../network/websocketwrapper.js"></script>
+        <script src="../network/connectioncontrol.js"></script>
+        <script src="../application/agent.js"></script>
+        <script src="../application/spiceconnection.js"></script>
+        <script src="../application/clientgui.js"></script>
+        <script src="../application/packetprocess.js"></script>
+        <script src="../application/packetfilter.js"></script>
+        <script src="../application/packetfactory.js"></script>
+        <script src="../application/application.js"></script>
+        <script src="../application/virtualmouse.js"></script>
+        <script src="../application/imagecache.js"></script>
+        <script src="../application/rasteroperation.js"></script>
+        <script src="../application/stream.js"></script>
+        <script src="../application/inputmanager.js"></script>
+        <script src="../process/busprocess.js"></script>
+        <script src="../process/displayprocess.js"></script>
+        <script src="../process/displaypreprocess.js"></script>
+        <script src="../process/inputprocess.js"></script>
+        <script src="../process/cursorprocess.js"></script>
+        <script src="../process/playbackprocess.js"></script>
+        <script src="../process/mainprocess.js"></script>
+        <script src="../keymaps/keymapes.js"></script>
+        <script src="../keymaps/keymapit.js"></script>
+        <script src="../keymaps/keymapus.js"></script>
+        <script src="../keymaps/keymapfr.js"></script>
+        <script src="../keymaps/keymapru.js"></script>
+        <script src="../keymaps/keymap.js"></script>
+        <script src="../application/WorkerProcess.js"></script>
+        <script src="../flexvdi/inactivity.js"></script>
+        <script src="../flexvdi/flexvdi.js"></script>
+        <script src="../flexvdi/extwin.js"></script>
+        <script src="../translation.js"></script>
+        <!-- end core (run.js intentionally excluded: it starts the app) -->
+
+        <!-- test data -->
+        <script src="graphictestfiles/uris.js"></script>
+
+        <!-- tests -->
+        <script src="application.test.js"></script>
+        <script src="busconnection.test.js"></script>
+        <script src="busprocess.test.js"></script>
+        <script src="clientgui.test.js"></script>
+        <script src="clusternodechooser.test.js"></script>
+        <script src="collisiondetector.test.js"></script>
+        <script src="connectioncontrol.test.js"></script>
+        <script src="displayprocess.test.js"></script>
+        <script src="displayrouter.test.js"></script>
+        <script src="eventobject.test.js"></script>
+        <script src="graphic.test.js"></script>
+        <script src="graphictest.test.js"></script>
+        <script src="imageuncompressor.test.js"></script>
+        <script src="inputmanager.test.js"></script>
+        <script src="keymap.test.js"></script>
+        <script src="packetcontroller.test.js"></script>
+        <script src="packetextractor.test.js"></script>
+        <script src="packetfactory.test.js"></script>
+        <script src="packetlinkfactory.test.js"></script>
+        <script src="packetprocess.test.js"></script>
+        <script src="packetreassembler.test.js"></script>
+        <script src="queue.test.js"></script>
+        <script src="reassemblerfactory.test.js"></script>
+        <script src="runqueue.test.js"></script>
+        <script src="sizedefiner.test.js"></script>
+        <script src="socket.test.js"></script>
+        <script src="socketqueue.test.js"></script>
+        <script src="spicechannel.test.js"></script>
+        <script src="spiceconnection.test.js"></script>
+        <script src="stuckkeyshandler.test.js"></script>
+        <script src="syncasynchandler.test.js"></script>
+        <script src="timelapsedetector.test.js"></script>
+        <script src="viewqueue.test.js"></script>
+
+
+        <!-- execution: run everything registered above -->
+        <script>
+            try { window.wdiTestRun(); }
+            catch (e) { window.__wdi_test_results = { error: 'runner failed to start: ' + ((e && e.message) || e) }; }
+        </script>
+    </head>
+    <body>
+        <!-- Minimal DOM scaffolding mirroring ../index.html so code that
+             queries these elements at construction time finds them. -->
+        <div id="login"></div>
+        <div id="screen"></div>
+        <input type="text" id="hiddeninput" style="display:none;opacity:0;font-size: 60px;color:transparent"/>
+        <div id="canvasSpace" style="display: none; height: 1024px"></div>
+        <div id="graphicDebug" style="display: none;">
+            <div id="debugInfo"></div>
+        </div>
+        <div id="overlay"></div>
+        <div id="error"><div id="error_text"></div></div>
+        <div id="extwin"><div id="extwin-title"></div></div>
+    </body>
+</html>
