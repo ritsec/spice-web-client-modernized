@@ -89,6 +89,11 @@ Always install the spice-vdagent and xorg-qxl to get the best results and to hav
 
 Spice web client has a very good performance connecting to remote windows sessions. Always install the spice-agent package including the qxl video driver to get the best results and to have custom resolutions etc.
 
+## Development & testing
+
+To build the test environment and run the unit test suite with Docker, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+
 ##More information
 
 For more information about the implementation or questions about roadmap etc contact Jose Carlos Norte (jcarlosn) at jcarlos.norte@gmail.com

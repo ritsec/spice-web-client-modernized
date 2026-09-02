@@ -29,7 +29,7 @@ suite('StuckKeysHandler:', function () {
 		return function () {
 			var fakeJqueryEvent = getFakeJqueryEvent('keydown', keyCode);
 			var expectedEvent = getExpectedEvent(keyCode);
-			this.stub(global, 'setTimeout', function (callback, timeout) {
+			this.stub(globalThis, 'setTimeout', function (callback, timeout) {
 				callback();
 			});
 			this.stub(window.jQuery, 'Event', function (type) {
@@ -48,11 +48,11 @@ suite('StuckKeysHandler:', function () {
 		return function () {
 			var fakeTimeoutId = 'fakeTimeoutId' + keyCode;
 
-			this.stub(global, 'setTimeout', function (callback, timeout) {
+			this.stub(globalThis, 'setTimeout', function (callback, timeout) {
 				return fakeTimeoutId;
 			});
 
-			this.mock(global)
+			this.mock(globalThis)
 				.expects('clearTimeout')
 				.once()
 				.withExactArgs(fakeTimeoutId);

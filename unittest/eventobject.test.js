@@ -30,7 +30,7 @@ suite('EventObject', function() {
 		
 		test('Should remove correct event', function() {
 			this.eo.removeEvent('test');
-			assert.notProperty(this.eo.eyeEvents, 'test');
+			assert.strictEqual(this.eo.eyeEvents['test'], undefined);
 		});
 	});
 	

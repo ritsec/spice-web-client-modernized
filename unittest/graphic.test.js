@@ -48,7 +48,7 @@ suite("Graphic suite", function () {
 
 
 	function testFunctionsReturnsImageData(method, self) {
-		var processResult = new ArrayBuffer([1, 2, 3, 4]);
+		var processResult = new ArrayBuffer(imageDescriptor.width * imageDescriptor.height * 4);
 		var imageUncompressor = new wdi.ImageUncompressor();
 		var imageUncompressorStub1 = self.stub(imageUncompressor, 'process',
 			function(imageDescriptor, imageData, brush, opaque, clientGui, callback, scope) {
@@ -82,7 +82,7 @@ suite("Graphic suite", function () {
 	}));
 
 	function testFlip (self, processResult) {
-		processResult = processResult || new ArrayBuffer([1, 2, 3, 4]);
+		processResult = processResult || new ArrayBuffer(imageDescriptor.width * imageDescriptor.height * 4);
 		var imageUncompressor = new wdi.ImageUncompressor();
 		var imageUncompressorStub = self.stub(imageUncompressor, 'process',
 			function(imageDescriptor, imageData, brush, opaque, clientGui, callback, scope) {
@@ -104,7 +104,7 @@ suite("Graphic suite", function () {
 		header.top_down = false;
 
 		var flipStub = this.stub(sut, 'imageFlip');
-		var processResult = new ArrayBuffer([1, 2, 3, 4]);
+		var processResult = new ArrayBuffer(imageDescriptor.width * imageDescriptor.height * 4);
 
 		testFlip(this, processResult);
 

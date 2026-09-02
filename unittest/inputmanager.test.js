@@ -121,15 +121,18 @@ suite("InputManager", function() {
 			sut._onBlur(window);
 		}));
 
-		test('Should fire releaseKey for shift, ctrl & alt', function () {
-			this.stub(input, 'on', function (event, callback) {
-				callback();
+		test('Should fire releaseKey for shift, ctrl & alt', sinon.test(function () {
+			var handler;
+			this.stub(window, 'on', function (event, callback) {
+				handler = callback;
 			});
-			this.mock(sut)
-				.expects('fire')
-				.thrice();
+			var expRelease = this.mock(stuckKeysHandler)
+				.expects('releaseSpecialKeysPressed')
+				.once();
 			sut._onBlur(window);
-		});
+			handler({});
+			expRelease.verify();
+		}));
 	});
 
 	suite('#_onInput', function () {

@@ -6,6 +6,8 @@ suite('PacketProcess', function() {
   suite('#process()', function() {
 	setup(function() {
 		this.toRestore = [];
+		this._origExceptionHandling = wdi.exceptionHandling;
+		wdi.exceptionHandling = false; // force the throwing path so invalid-channel errors propagate
 		this.packetProcess = new wdi.PacketProcess({
 			mainProcess: true,
 			displayProcess: true,
@@ -39,6 +41,7 @@ suite('PacketProcess', function() {
 		this.toRestore.forEach(function(item) {
 			item.restore();
 		});
+		wdi.exceptionHandling = this._origExceptionHandling;
 	});
   });
 });
