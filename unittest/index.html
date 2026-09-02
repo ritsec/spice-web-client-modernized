@@ -159,11 +159,6 @@
         <script src="viewqueue.test.js"></script>
 
 
-        <!-- execution: run everything registered above -->
-        <script>
-            try { window.wdiTestRun(); }
-            catch (e) { window.__wdi_test_results = { error: 'runner failed to start: ' + ((e && e.message) || e) }; }
-        </script>
     </head>
     <body>
         <!-- Minimal DOM scaffolding mirroring ../index.html so code that
@@ -178,5 +173,12 @@
         <div id="overlay"></div>
         <div id="error"><div id="error_text"></div></div>
         <div id="extwin"><div id="extwin-title"></div></div>
+        <!-- execution: run everything registered above. Placed at the end of the
+             body so DOM scaffolding is parsed before the runner's synchronous phase
+             executes (the runner starts its first test immediately on call). -->
+        <script>
+            try { window.wdiTestRun(); }
+            catch (e) { window.__wdi_test_results = { error: 'runner failed to start: ' + ((e && e.message) || e) }; }
+        </script>
     </body>
 </html>

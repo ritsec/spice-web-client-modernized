@@ -50,9 +50,9 @@ suite('GraphicTest', function() {
 					clientGui.getCanvas = function() {
 						return ctxOrigin.canvas;
 					};
-				clientGui.getContext = function() {
+					clientGui.getContext = function() {
 					return ctxOrigin;
-				};
+					};
 					displayPreProcess.displayProcess.postProcess = function() {
 						var originURL = ctxOrigin.canvas.toDataURL('image/png');
 						var expectedURL = ctxExpected.canvas.toDataURL('image/png');
