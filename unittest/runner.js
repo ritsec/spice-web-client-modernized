@@ -199,12 +199,18 @@
 
 				var restoreError = null;
 				for (i = 0; i < auto.length; i++) {
+					var fake = auto[i].fake;
 					if (auto[i].restored) { continue; }
-					try {
-						auto[i].fake.restore();
-					} catch (e) {
-						if (!restoreError) { restoreError = e; }
+					// Mocks carry unmet-expectation state; verify() throws on
+					// unmet expectations AND internally calls restore() (which our
+					// wrapper records as restored). Stubs/spies have no verify().
+					if (typeof fake.verify === 'function') {
+						try { fake.verify(); }
+						catch (e) { if (!restoreError) { restoreError = e; } }
+						if (auto[i].restored) { continue; }
 					}
+					try { fake.restore(); }
+					catch (e) { if (!restoreError) { restoreError = e; } }
 				}
 				if (!ok) {
 					stats.failed++;
