@@ -163,4 +163,13 @@ suite("ClientGui:", function() {
 		}));
 	});
 
+	suite('#setClipBoardData', function () {
+		test('emits clipboardCopied with the guest clipboard data', function () {
+			var fired = null;
+			sut.addListener('clipboardCopied', function (data) { fired = data; });
+			sut.setClipBoardData('GUEST-CLIP-TEXT');
+			assert.strictEqual(fired, 'GUEST-CLIP-TEXT');
+		});
+	});
+
 });
