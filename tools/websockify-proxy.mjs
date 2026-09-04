@@ -95,7 +95,11 @@ server.on('upgrade', (req, socket, head) => {
   const t0 = Date.now();
   resolveToken()
     .then((token) => {
-      const cookie = `sessionid=${SESSIONID}; csrftoken=${CSRF}; recent_project=${RECENT}; token=${token}`;
+      const cookieParts = [`token=${token}`];
+      if (SESSIONID) cookieParts.push(`sessionid=${SESSIONID}`);
+      if (CSRF) cookieParts.push(`csrftoken=${CSRF}`);
+      if (RECENT) cookieParts.push(`recent_project=${RECENT}`);
+      const cookie = cookieParts.join('; ');
       wss.handleUpgrade(req, socket, head, (clientWs) => {
         const upstreamUrl = `wss://${UPSTREAM_HOST}:${UPSTREAM_PORT}/websockify`;
         const upstream = new WebSocket(upstreamUrl, { headers: { Cookie: cookie }, protocol: 'binary' });
