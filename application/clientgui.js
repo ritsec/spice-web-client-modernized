@@ -118,7 +118,9 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	checkFeatures: function() {
-		if (!Modernizr.canvas || !Modernizr.websockets) {
+		var hasCanvas = !!(document.createElement('canvas').getContext);
+		var hasWebSockets = (typeof WebSocket !== 'undefined');
+		if (!hasCanvas || !hasWebSockets) {
 			alert('Your Browser is not compatible with WDI. Visit ... for a list of compatible browsers');
 			return false;
 		}
@@ -366,14 +368,9 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			eventLayer.attr('contentEditable', true);
 		}
 
-		eventLayer.requestPointerLock = eventLayer.requestPointerLock || eventLayer.mozRequestPointerLock;
-		document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
-
 		if ("onpointerlockchange" in document) {
 			document.addEventListener('pointerlockchange', lockChangeAlert, false);
-		  } else if ("onmozpointerlockchange" in document) {
-			document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
-		  }
+		}
 
 		eventLayer.bind('touchstart', function(event) {
 			event.preventDefault();
@@ -651,23 +648,31 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	handleKey: function(e) {
-		console.log("Type: " + e.type + " keyCode: " + e.keyCode + " charCode: " + e.charCode);
+		console.log("Type: " + e.type + " key: " + e.key + " code: " + e.code);
 		document.getElementById("inputmanager").focus();
+		// Ensure legacy keyCode is present (for synthetic/generated events and
+		// older browsers). Modern KeyboardEvent.code is the primary source.
+		if ((!e.keyCode || e.keyCode === 0) && e.code && wdi.Keymap.keyCodeFromCode) {
+			var derived = wdi.Keymap.keyCodeFromCode(e.code);
+			if (derived !== undefined) e.keyCode = derived;
+		}
 		e.data[0].generateEvent.call(e.data[0], e.type, [e]);
 
 		if ((e.ctrlKey && !e.altKey) ||
 		    (wdi.Keymap.isInKeymap(e.keyCode) && e.type !== "keypress")) {
 			e.preventDefault();
 		}
-		//e.data[0].stuckKeysHandler.handleStuckKeys(e);
 	},
 
 	setClipBoardData: function(data) {
-		//we have received new clipboard data
-		//show to the user
-		//TODO: create a new dialog with buttons to copy the data directly
-		//from the textbox
-		prompt("New clipboard data available, press ctrl+c to copy it", data);
+		//we have received new clipboard data from the guest
+		//write it to the host clipboard (non-blocking)
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(data).catch(function(err) {
+				console.warn('Failed to write to host clipboard:', err);
+			});
+		}
+		this.fire('clipboardCopied', data);
 	},
 
 	initSound: function() {
@@ -724,8 +729,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	capturePointer() {
 		if (!document.pointerLockElement
-			&& !document.mozPointerLockElement
-			&& typeof this.eventLayer.requestPointerLock === "function") {
+						&& typeof this.eventLayer.requestPointerLock === "function") {
 			this.eventLayer.requestPointerLock();
 		}
 	}

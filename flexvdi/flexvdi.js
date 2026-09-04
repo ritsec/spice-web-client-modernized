@@ -55,6 +55,7 @@ function hideMenuBar() {
     }
 }
 function closeSession(inactivity) {
+    if (inactivityClosed) return;
     inactivityClosed = true;
     clearTimeout(inactivityTimer);
     clearTimeout(inactivityCountdownTimer);

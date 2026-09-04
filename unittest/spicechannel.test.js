@@ -144,7 +144,7 @@ suite('SpiceChannel', function() {
 	suite('#connection', function() {
 
 		test('connect should call socketQ connect with host and port if they are present', function() {
-			var expectedString = config['protocol'] + '://' + config['host'] + ':' + document.location.port + '/?ver=2&token=' + config['port'];
+		var expectedString = config['protocol'] + '://' + config['host'] + ':' + config['port'] + '/websockify';
 			var mock = sinon.mock(socketQ);
 			var stub = sinon.stub(packetReassembler, 'start');
 			var expectation = mock.expects('connect').once().withArgs(expectedString);
@@ -161,7 +161,7 @@ suite('SpiceChannel', function() {
                 type: 'spice',
                 token: 'sdfjgsd8f'
             };
-            var expectedString = tokenedConfig['protocol'] + '://' + tokenedConfig['host'] + ':' + document.location.port + '/?ver=2&token=' + tokenedConfig['port'];
+            var expectedString = tokenedConfig['protocol'] + '://' + tokenedConfig['host'] + ':' + tokenedConfig['port'] + '/websockify';
             var mock = sinon.mock(socketQ);
             var stub = sinon.stub(packetReassembler, 'start');
             var expectation = mock.expects('connect').once().withArgs(expectedString);

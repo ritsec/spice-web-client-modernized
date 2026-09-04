@@ -134,6 +134,67 @@ wdi.Keymap = {
         //"AudioVolumeUp": [0xE0, 0, 0, 0],
         //"WakeUp": [0xE0, 0, 0, 0],
     },
+    codeKeyCodes: {
+        "AltLeft": 18,
+        "AltRight": 18,
+        "ArrowDown": 40,
+        "ArrowLeft": 37,
+        "ArrowRight": 39,
+        "ArrowUp": 38,
+        "Backquote": 192,
+        "Backslash": 220,
+        "Backspace": 8,
+        "BracketLeft": 219,
+        "BracketRight": 221,
+        "CapsLock": 20,
+        "Comma": 188,
+        "ControlLeft": 17,
+        "ControlRight": 17,
+        "ContextMenu": 93,
+        "Delete": 46,
+        "Digit0": 48,
+        "Digit1": 49,
+        "Digit2": 50,
+        "Digit3": 51,
+        "Digit4": 52,
+        "Digit5": 53,
+        "Digit6": 54,
+        "Digit7": 55,
+        "Digit8": 56,
+        "Digit9": 57,
+        "End": 35,
+        "Enter": 13,
+        "Escape": 27,
+        "Equal": 187,
+        "F1": 112, "F2": 113, "F3": 114, "F4": 115,
+        "F5": 116, "F6": 117, "F7": 118, "F8": 119,
+        "F9": 120, "F10": 121, "F11": 122, "F12": 123,
+        "Home": 36,
+        "Insert": 45,
+        "KeyA": 65, "KeyB": 66, "KeyC": 67, "KeyD": 68,
+        "KeyE": 69, "KeyF": 70, "KeyG": 71, "KeyH": 72,
+        "KeyI": 73, "KeyJ": 74, "KeyK": 75, "KeyL": 76,
+        "KeyM": 77, "KeyN": 78, "KeyO": 79, "KeyP": 80,
+        "KeyQ": 81, "KeyR": 82, "KeyS": 83, "KeyT": 84,
+        "KeyU": 85, "KeyV": 86, "KeyW": 87, "KeyX": 88,
+        "KeyY": 89, "KeyZ": 90,
+        "MetaLeft": 91,
+        "MetaRight": 93,
+        "Minus": 189,
+        "NumLock": 144,
+        "PageDown": 34,
+        "PageUp": 33,
+        "Period": 190,
+        "PrintScreen": 44,
+        "Quote": 222,
+        "ScrollLock": 145,
+        "Semicolon": 186,
+        "ShiftLeft": 16,
+        "ShiftRight": 16,
+        "Slash": 191,
+        "Space": 32,
+        "Tab": 9
+    },
     keymap: {},
     ctrlKeymap: {},
     charmap: {},
@@ -164,6 +225,22 @@ wdi.Keymap = {
     isInKeymap: function(keycode) {
         if (this.keymap[keycode] === undefined) return false;
         else return true;
+    },
+    keyCodeFromCode: function(code) {
+        if (!code) return undefined;
+        if (this.codeKeyCodes[code] !== undefined) {
+            return this.codeKeyCodes[code];
+        }
+        if (code.length >= 3 && code[0] === "Key" && code.length === 3) {
+            var letter = code[2].toUpperCase();
+            var c = letter.charCodeAt(0);
+            if (c >= 65 && c <= 90) return c;
+        }
+        if (code.length >= 4 && code.slice(0, 4) === "Numpad" && code.length === 6) {
+            var d = code[5].charCodeAt(0);
+            if (d >= 48 && d <= 57) return 96 + (d - 48);
+        }
+        return undefined;
     },
 
     /**

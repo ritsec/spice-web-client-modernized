@@ -20,8 +20,6 @@ suite("tests suite", function () {
 				//region fakes
 				window = domWindow;
 				fakeWorkerProcess();
-				Modernizr = {};
-				Modernizr['websocketsbinary'] = true;
 				WebSocket = require("websocket").client;
 
 				//endregion fakes
@@ -34,7 +32,7 @@ suite("tests suite", function () {
 				Canvas = require('canvas'),
 				Image = Canvas.Image,
 				BigInteger = require("../lib/biginteger").BigInteger,
-				window.$=require("../lib/jquery-2.0.3"),
+				window.$=require("../lib/jquery-3.7.1.min"),
 				window.bowser = require("../lib/bowser"),
 				require("../lib/virtualjoystick"),
 				require("../lib/utils"),
