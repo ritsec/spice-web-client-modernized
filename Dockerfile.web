@@ -9,7 +9,7 @@
 # Route (cert-manager / letsencrypt). The browser connects cross-origin to the
 # OpenStack websockify endpoint (CORS enabled on the OpenStack side), so this
 # container needs no backend proxy and no credentials.
-FROM nginx:stable-alpine
+FROM nginx-unprivileged:stable-alpine
 
 # Static client + assets, then strip build/dev files out of the web root so
 # they are not publicly served.

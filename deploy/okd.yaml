@@ -163,8 +163,6 @@ spec:
         app: spice-web-client
     spec:
       serviceAccountName: spice-web-client
-      imagePullSecrets:
-        - name: default-route-credentials-spice
       containers:
         - name: web
           image: image-registry.openshift-image-registry.svc:5000/spice/spice-web-client:latest
