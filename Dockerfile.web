@@ -1,0 +1,26 @@
+# Production web server for the SPICE web client (static frontend).
+#
+# Built IN-CLUSTER by the OKD BuildConfig
+#   (spec.strategy.dockerStrategy.dockerfilePath: Dockerfile.web)
+# from the public git source
+#   https://github.com/ritsec/spice-web-client-modernized
+#
+# Serves index.html + assets over plain HTTP; TLS is terminated at the OKD
+# Route (cert-manager / letsencrypt). The browser connects cross-origin to the
+# OpenStack websockify endpoint (CORS enabled on the OpenStack side), so this
+# container needs no backend proxy and no credentials.
+FROM nginx:stable-alpine
+
+# Static client + assets, then strip build/dev files out of the web root so
+# they are not publicly served.
+COPY . /usr/share/nginx/html/
+RUN rm -f /usr/share/nginx/html/Dockerfile \
+         /usr/share/nginx/html/Dockerfile.web \
+         /usr/share/nginx/html/nginx.conf \
+         /usr/share/nginx/html/sonar.properties \
+         /usr/share/nginx/html/commit-stage.sh
+
+# Minimal production nginx config (gzip + static asset caching + MIME).
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

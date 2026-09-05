@@ -1,0 +1,28 @@
+# VCS
+.git
+.gitignore
+# Docs & repo meta (not needed at runtime)
+*.md
+sonar.properties
+commit-stage.sh
+package.json
+# Dev & test tooling (not needed at runtime)
+unittest/
+tools/
+vendor/
+graphictestfiles/
+spiceproxy/
+Dockerfile
+Dockerfile.web
+# OKD deploy manifest (not a runtime asset; keep it out of the public web root)
+deploy/
+# Build output
+dist/
+spice-client.js
+# Local / sensitive (NEVER bake into the image)
+.screenrc
+.env*
+*.env
+*openrc*
+*cred*
+node_modules/
