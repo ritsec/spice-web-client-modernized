@@ -152,7 +152,7 @@ spec:
         - name: default-route-credentials-spice
       containers:
         - name: web
-          image: spice-web-client:latest
+          image: image-registry.openshift-image-registry.svc:5000/spice/spice-web-client:latest
           imagePullPolicy: Always
           ports:
             - name: http
