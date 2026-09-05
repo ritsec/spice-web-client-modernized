@@ -282,7 +282,7 @@ function start () {
 		'externalClipboardHandling': false,
 		'disableClipboard': false,
 		'layer': document.getElementById('screen'),
-		'vmInfoToken': getURLParameter('vmInfoToken'),
+		'vmInfoToken': getURLParameter('vmInfoToken') || getURLParameter('token'),
 		'canvasMargin': {
 			'x': 0,
 			'y': 40
