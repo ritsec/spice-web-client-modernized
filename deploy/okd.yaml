@@ -1,35 +1,82 @@
-# ---------------------------------------------------------------------------
-# OKD deployment for the SPICE web client (static frontend) at spice.ritsec.cloud
+# =============================================================================
+# RITSEC SPICE Web Client — one-shot OKD / Kubernetes deployment
+#   domain:    spice.ritsec.cloud
+#   source:    https://github.com/ritsec/spice-web-client-modernized (public)
 #
-# Apply:        kubectl apply -f deploy/okd.yaml        (or: oc apply -f ...)
-# First build:  oc start-build spice-web-client -n spice
+#   kubectl apply -f deploy/okd.yaml
+#   oc start-build spice-web-client -n spice                              # first build
+#   kubectl rollout restart deployment/spice-web-client -n spice         # after each rebuild
 #
-# Flow:
-#   BuildConfig      builds Dockerfile.web IN-CLUSTER from the PUBLIC git source
-#                    (no git secret needed) and pushes to the internal registry.
-#   ImageStream      'spice-web-client' holds the built image tag(s).
-#   DeploymentConfig runs 2 replicas of the static server and AUTO-redeploys on
-#                    every completed build (imageChange trigger, automatic: true).
-#   Service          cluster-internal :80.
-#   Ingress / Route  spice.ritsec.cloud, edge TLS via cert-manager (ACME).
+# Architecture
+#   BuildConfig (build.openshift.io/v1)  -- builds in-cluster from public git
+#     -> ImageStream spice-web-client:latest  (internal registry, no pre-push)
+#          -> Deployment (apps/v1, 2 replicas, stateless)
+#               -> Service :80  ->  Ingress spice.ritsec.cloud (edge TLS via cert-manager)
 #
-# The SPICE websockify proxy already runs on the OpenStack side
-# (stack.ritsec.cloud:6082, CORS enabled); the browser connects cross-origin, so
-# the pod is pure static serving — no backend, no secrets, trivially parallel.
-#
-# Assumptions (each a one-line change if yours differs):
-#   namespace ...................... spice
-#   build source ........... https://github.com/ritsec/spice-web-client-modernized
-#   build ref (branch/tag) ......... add-unit-test   (verified modernized code)
-#   cert-manager cluster-issuer .... letsencrypt-http-prod
-# ---------------------------------------------------------------------------
+# Security
+#   * The default ServiceAccount is never used.
+#       - pod:    SA `spice-web-client`, role-free, token unmounted (serves static
+#                 files only; the browser talks to the OpenStack websockify proxy).
+#       - build:  SA `spice-build`, scoped to system:image-pusher/puller only.
+#   * No OpenStack credentials / clouds.yaml are stored in the cluster.
+# =============================================================================
 
+# Namespace -------------------------------------------------------------------
 apiVersion: v1
 kind: Namespace
 metadata:
   name: spice
+  labels:
+    name: spice
+
 ---
-# 1. Image stream — target for the in-cluster build.
+# Pod SA: static file server, zero API access, token not mounted. -------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spice-web-client
+  namespace: spice
+
+---
+# Build SA: only what a Docker build needs (push result, pull base image). ----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spice-build
+  namespace: spice
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-build-image-pusher
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-pusher
+subjects:
+  - kind: ServiceAccount
+    name: spice-build
+    namespace: spice
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-build-image-puller
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: spice-build
+    namespace: spice
+
+---
+# ImageStream ------------------------------------------------------------------
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
@@ -40,9 +87,11 @@ metadata:
 spec:
   tags:
     - name: latest
+      referencePolicy:
+
 ---
-# 2. In-cluster build from the public git source (no auth required).
-apiVersion: apps.openshift.io/v1
+# BuildConfig (build.openshift.io/v1) -----------------------------------------
+apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
   name: spice-web-client
@@ -55,11 +104,12 @@ spec:
     git:
       uri: https://github.com/ritsec/spice-web-client-modernized
       ref: add-unit-test
-    # If the repo is ever made PRIVATE, create a secret and reference it:
-    #   oc create secret generic spice-git \
-    #     --from-literal=username=<GH_USER> --from-literal=password=<GH_TOKEN> -n spice
-    # secrets:
-    #   - name: spice-git
+      # If the repo goes private, create a token secret and uncomment:
+      #   oc create secret generic spice-git \
+      #     --from-literal=username=<gh-user> \
+      #     --from-literal=password=<personal-access-token> -n spice
+      # secrets:
+      #   - name: spice-git
   strategy:
     type: Docker
     dockerStrategy:
@@ -68,14 +118,14 @@ spec:
     to:
       kind: ImageStreamTag
       name: spice-web-client:latest
-    pushSecret: {}
-  # Rebuild if this spec changes; the first build is kicked off with `oc start-build`.
+  serviceAccountName: spice-build
   triggers:
-    - type: configChange
+    - type: ConfigChange
+
 ---
-# 3. Stateless static server (2 replicas), auto-deploys on each completed build.
-apiVersion: apps.openshift.io/v1
-kind: DeploymentConfig
+# Deployment (apps/v1) ----------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: spice-web-client
   namespace: spice
@@ -84,57 +134,51 @@ metadata:
 spec:
   replicas: 2
   selector:
-    app: spice-web-client
+    matchLabels:
+      app: spice-web-client
   strategy:
     type: RollingUpdate
-    rollingParams:
-      maxUnavailable: 1
+    rollingUpdate:
       maxSurge: 1
-  triggers:
-    - type: imageChange
-      imageChangeParams:
-        automatic: true
-        containerNames:
-          - web
-    - type: configChange
+      maxUnavailable: 0
   template:
     metadata:
       labels:
         app: spice-web-client
     spec:
-      # Resolves to image-registry.openshift-image-registry.svc:5000/spice/spice-web-client:latest.
-      # OKD 4.x permits same-cluster internal-registry pulls via the default SA.
-      # If your cluster requires an explicit pull secret, add:
-      #   imagePullSecrets:
-      #     - name: default-route-credentials-spice
+      serviceAccountName: spice-web-client
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: default-route-credentials-spice
       containers:
         - name: web
           image: spice-web-client:latest
+          imagePullPolicy: Always
           ports:
-            - containerPort: 80
-              name: http
+            - name: http
+              containerPort: 80
           readinessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 3
             periodSeconds: 10
-            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /
               port: 80
             initialDelaySeconds: 5
-            periodSeconds: 20
-            timeoutSeconds: 3
+            periodSeconds: 15
           resources:
             requests:
               cpu: 50m
               memory: 64Mi
             limits:
+              cpu: 200m
               memory: 128Mi
+
 ---
-# 4. Cluster-internal service.
+# Service -----------------------------------------------------------------------
 apiVersion: v1
 kind: Service
 metadata:
@@ -146,12 +190,12 @@ spec:
   selector:
     app: spice-web-client
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
-      protocol: TCP
-      name: http
+
 ---
-# 5. Public route — spice.ritsec.cloud, edge TLS via cert-manager (ACME).
+# Ingress -----------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -162,6 +206,11 @@ metadata:
     route.openshift.io/termination: "edge"
     route.openshift.io/insecure-edge-termination-policy: Redirect
 spec:
+  ingressClassName: openshift-default
+  tls:
+    - hosts:
+        - spice.ritsec.cloud
+      secretName: spice-tls
   rules:
     - host: spice.ritsec.cloud
       http:
@@ -173,7 +222,3 @@ spec:
                 name: spice-web-client
                 port:
                   number: 80
-  tls:
-    - hosts:
-        - spice.ritsec.cloud
-      secretName: spice-tls
