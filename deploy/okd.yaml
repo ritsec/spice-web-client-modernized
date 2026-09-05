@@ -15,8 +15,8 @@
 #
 # Security
 #   * The default ServiceAccount is never used.
-#       - pod:    SA `spice-web-client`, role-free, token unmounted (serves static
-#                 files only; the browser talks to the OpenStack websockify proxy).
+#       - pod:    SA `spice-web-client`, scoped to system:image-puller only (serves static
+#                 files; the browser talks to the OpenStack websockify proxy itself).
 #       - build:  SA `spice-build`, scoped to system:image-pusher/puller only.
 #   * No OpenStack credentials / clouds.yaml are stored in the cluster.
 # =============================================================================
@@ -36,6 +36,22 @@ kind: ServiceAccount
 metadata:
   name: spice-web-client
   namespace: spice
+
+---
+# Pod SA pull permission: scoped to pulling from the internal registry only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-web-client-image-puller
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: spice-web-client
+    namespace: spice
 
 ---
 # Build SA: only what a Docker build needs (push result, pull base image). ----
@@ -147,7 +163,6 @@ spec:
         app: spice-web-client
     spec:
       serviceAccountName: spice-web-client
-      automountServiceAccountToken: false
       imagePullSecrets:
         - name: default-route-credentials-spice
       containers:
