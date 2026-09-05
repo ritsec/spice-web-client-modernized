@@ -268,7 +268,7 @@ function start () {
 		'host': getURLParameter('host') || 'stack.ritsec.cloud',
 		'port': parseInt(getURLParameter('port') || '6082', 10),
 		'protocol': getURLParameter('protocol') || 'wss',
-		'token': data['spice_password'] || getURLParameter('token') || '',
+		'token': data['spice_password'] || '',
 		'vmHost': getURLParameter('vmhost') || false,
 		'vmPort': getURLParameter('vmport') || false,
 		'useBus': false,
