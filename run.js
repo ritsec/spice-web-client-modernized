@@ -313,6 +313,7 @@ $(document).ready(() => {
   }).click(function() {
       console.log("Creating new AudioContext from user gesture");
       audioContext = new AudioContext();
+      requestClipboardPermission(); // elicit clipboard-read permission (user gesture)
       $('#soundButtonContainer').remove();
       console.log("Starting application");
       start();

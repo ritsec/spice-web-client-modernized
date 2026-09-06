@@ -147,6 +147,23 @@ function sendKeystroke(e) {
     app.sendKeystroke($(e).text());
     document.getElementById("inputmanager").focus();
 }
+function copyToVM() {
+    app.clientGui.copyFromHost();
+}
+
+function requestClipboardPermission() {
+    if (!(navigator.clipboard && navigator.clipboard.readText)) {
+        console.warn('Clipboard API unavailable (needs HTTPS); paste will prompt on first use');
+        return;
+    }
+    // Called from a user gesture (the Start button click), so readText() surfaces the
+    // clipboard-read permission prompt in Chromium and Firefox alike. The read value is
+    // discarded -- we only want to elicit/record the permission early.
+    navigator.clipboard.readText()
+        .then(function () { console.log('clipboard-read permission granted'); })
+        .catch(function (err) { console.warn('clipboard-read not granted yet:', err && err.name); });
+}
+
 
 function showKeystrokesMenu() {
     $("#keystrokes-menu").toggleClass("show");

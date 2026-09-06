@@ -75,9 +75,9 @@ suite("Keymap", function() {
 			var e = { originalEvent: { code: 'KeyA' } };
 			assert.deepEqual(sut.getScanCodes(e, false, 'keydown'), [[0x1E, 0, 0, 0]]);
 		});
-		test('returns the same scan code for a keypress (no release bit)', function () {
+		test('does not re-emit on keypress (keydown already sent the press)', function () {
 			var e = { originalEvent: { code: 'KeyA' } };
-			assert.deepEqual(sut.getScanCodes(e, false, 'keypress'), [[0x1E, 0, 0, 0]]);
+			assert.deepEqual(sut.getScanCodes(e, false, 'keypress'), []);
 		});
 		test('sets the release bit for a keyup event', function () {
 			var e = { originalEvent: { code: 'KeyA' } };

@@ -253,6 +253,13 @@ wdi.Keymap = {
             code = e.originalEvent.code;
             if (code != "" && code != 'Unidentified') {
                 console.log("Use KeyboardEvent.code = " + code + ", " + type);
+                // keydown already emitted the press for this physical key; a
+                // keypress event would emit the same scan code a second time,
+                // doubling printable characters. The legacy path never emitted
+                // on keypress, so skip it here too.
+                if (type == 'keypress') {
+                    return [];
+                }
                 result = []
                 scanCodes = this.defaultCodes[code].slice();
                 if (type != 'keydown' && type != 'keypress') {
