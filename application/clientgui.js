@@ -657,11 +657,12 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			if (derived !== undefined) e.keyCode = derived;
 		}
 		e.data[0].generateEvent.call(e.data[0], e.type, [e]);
-		// Ctrl+V: pull the host clipboard into the VM. The DOM paste event is
-		// unreliable here (no focused editable element), so read it directly.
-		if (e.type === 'keydown' && e.ctrlKey && !e.altKey && e.keyCode === 86) {
-			this.copyFromHost();
-		}
+// seems unnecessary
+//		// Ctrl+V: pull the host clipboard into the VM. The DOM paste event is
+//		// unreliable here (no focused editable element), so read it directly.
+//		if (e.type === 'keydown' && e.ctrlKey && !e.altKey && e.keyCode === 86) {
+//			this.copyFromHost();
+//		}
 
 		if ((e.ctrlKey && !e.altKey) ||
 		    (wdi.Keymap.isInKeymap(e.keyCode) && e.type !== "keypress")) {
@@ -681,7 +682,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	// Host → guest: read the host clipboard (needs a user gesture + permission)
-	// and send it into the VM. Triggered by the "Copiar a la VM" button or Ctrl+V.
+	// and send it into the VM. Triggered by the "Paste in VM (Ctrl+V)" button or Ctrl+V.
 	copyFromHost: function() {
 		var self = this;
 		if (navigator.clipboard && navigator.clipboard.readText) {

@@ -38,6 +38,7 @@ var translations = {
         show_id: "This browser's ID is: _",
         no_auto_fs: "This browser does not support automatic fullscreen switch. Please, press F11 to switch manually.",
         msg_click_to_capture: "Click inside the virtual desktop to capture the mouse. Then press ESC to release pointer.",
+	copytovm: "Paste in VM (Ctrl+V)",
     },
 	ru: {
         uploadfile: "Загрузить файл",
