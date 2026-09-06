@@ -164,6 +164,26 @@ function requestClipboardPermission() {
         .catch(function (err) { console.warn('clipboard-read not granted yet:', err && err.name); });
 }
 
+function toggleClientCursor() {
+    // Toggle the browser's native cursor over the VM canvas. Some guests without the
+    // SPICE agent never render their own pointer; this forces a visible, usable
+    // (absolute) cursor as a fallback. Default is off -- existing mouse behavior wins.
+    var visible = false;
+    if (app && app.clientGui) {
+        visible = app.clientGui.toggleClientCursor();
+    }
+    updateCursorButton(visible);
+    return visible;
+}
+
+function updateCursorButton(visible) {
+    var btn = document.getElementById("cursortoggle");
+    if (btn) {
+        btn.textContent = visible ? "Cursor: on" : "Cursor: off";
+        btn.style.backgroundColor = visible ? "#2e7d32" : "";
+    }
+}
+
 
 function showKeystrokesMenu() {
     $("#keystrokes-menu").toggleClass("show");

@@ -49,6 +49,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	triedCapturingPointer: false,
 	mouse_status: 0,
 	eventLayer: null,
+	clientCursorVisible: false,
 	counter: 0,
 	mainCanvas: 0,
 	firstTime: true,
@@ -518,7 +519,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				self.mouse_status = 1;
 
 
-				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
+				if (self.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
 					this.triedCapturingPointer = true;
 					app.clientGui.capturePointer();
 				}
@@ -529,8 +530,8 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				var x = event.pageX;
 				var y = event.pageY;
 				var offset = $(this).offset();
-				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
-					self.generateEvent.call(self, 'mousemove', [x - offset.left, y - offset.top, self.mouse_status, self.mouse_mode]);
+				if (self.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+					self.generateEvent.call(self, 'mousemove', [x - offset.left, y - offset.top, self.mouse_status, self.effectiveMouseMode()]);
 				} else if (this.triedCapturingPointer) {
 					var e = event.originalEvent;
 					var dx = e.movementX  ||
@@ -551,7 +552,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 						dx = x - offset.left - wdi.VirtualMouse.lastMousePosition.x;
 						dy = y - offset.top - wdi.VirtualMouse.lastMousePosition.y;
 					}
-					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, self.mouse_mode]);
+					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, self.effectiveMouseMode()]);
 				}
 				event.preventDefault();
 			});
@@ -625,7 +626,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	setMouseMode: function(mode) {
 		this.mouse_mode = mode;
-		if (mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
+		if (mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER && !this.clientCursorVisible) {
 			this.triedCapturingPointer = false;
 			$.nok({
 				message: tr['msg_click_to_capture']
@@ -636,7 +637,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	updateMousePointer: function() {
 		if(this.eventLayer != null) {
-			if(this.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+			if(this.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
 				console.log("Setting cursor to default")
 				$(this.eventLayer).css('cursor', 'default');
 				this.releasePointer();
@@ -645,6 +646,28 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				$(this.eventLayer).css('cursor', 'none');
 			}
 		}
+	},
+
+	setClientCursorVisible: function(visible) {
+		this.clientCursorVisible = visible;
+		if (visible) {
+			// behave as absolute (CLIENT) mouse from now on; ignore capture state
+			this.triedCapturingPointer = false;
+		}
+		this.updateMousePointer();
+	},
+
+	toggleClientCursor: function() {
+		this.setClientCursorVisible(!this.clientCursorVisible);
+		return this.clientCursorVisible;
+	},
+
+	effectiveMouseMode: function() {
+		// Client-cursor fallback: force absolute (CLIENT) mouse behavior so the
+		// visible cursor tracks the pointer and the pointer lock isn't engaged.
+		return this.clientCursorVisible
+			? wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT
+			: this.mouse_mode;
 	},
 
 	handleKey: function(e) {
