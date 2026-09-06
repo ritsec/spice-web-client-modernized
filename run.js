@@ -304,6 +304,31 @@ function closeIntegrationBenchmark () {
 }
 
 $(document).ready(() => {
+  // Shared boot steps: elicit clipboard-read permission, clear the Start gate, start.
+  function boot() {
+    requestClipboardPermission();
+    $('#soundButtonContainer').remove();
+    start();
+  }
+
+  if (getURLParameter('autostart') === 'true') {
+    // ?autostart=true: skip the Start gate and boot immediately. No user gesture is
+    // available, so any AudioContext starts suspended (resume on first interaction)
+    // and the clipboard-read prompt is deferred to first use. AudioContext creation
+    // is guarded so a headless/automation context without an audio backend still boots.
+    console.log('autostart=true -- skipping the Start gate');
+    try { audioContext = new AudioContext(); } catch (e) { audioContext = null; }
+    if (audioContext) {
+      var resume = function () { if (audioContext.state === 'suspended') { audioContext.resume(); } };
+      document.addEventListener('pointerdown', resume, { once: true });
+      document.addEventListener('keydown', resume, { once: true });
+    }
+    boot();
+    return;
+  }
+
+  // Default: the Start click is the user gesture that lets audio start running and
+  // lets us surface the clipboard-read prompt.
   var $button = $('<button>Start</button>', {id: "startAudio"}).css({
     padding: "10px 25px",
     fontSize: "25px",
@@ -313,10 +338,7 @@ $(document).ready(() => {
   }).click(function() {
       console.log("Creating new AudioContext from user gesture");
       audioContext = new AudioContext();
-      requestClipboardPermission(); // elicit clipboard-read permission (user gesture)
-      $('#soundButtonContainer').remove();
-      console.log("Starting application");
-      start();
+      boot();
     });
 
   var $messageContainer = $('<div id="messageContainer"><p>Click to start using your virtual session:</p></div>').css({
