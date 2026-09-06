@@ -519,7 +519,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				self.mouse_status = 1;
 
 
-				if (self.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
+				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER && !self.clientCursorVisible) {
 					this.triedCapturingPointer = true;
 					app.clientGui.capturePointer();
 				}
@@ -530,29 +530,25 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				var x = event.pageX;
 				var y = event.pageY;
 				var offset = $(this).offset();
-				if (self.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
-					self.generateEvent.call(self, 'mousemove', [x - offset.left, y - offset.top, self.mouse_status, self.effectiveMouseMode()]);
-				} else if (this.triedCapturingPointer) {
+				var ax = x - offset.left;
+				var ay = y - offset.top;
+				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+					// guest in absolute (client) mode: send the absolute position
+					self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
+				} else if (self.clientCursorVisible || this.triedCapturingPointer) {
+					// guest in relative (server) mode: send motion deltas
 					var e = event.originalEvent;
-					var dx = e.movementX  ||
-						e.mozMovementX    ||
-						e.webkitMovementX ||
-						0;
-					var dy = e.movementY  ||
-						e.mozMovementY    ||
-						e.webkitMovementY ||
-						0;
-					// Sometimes mousemove events with dx == dy == 0 are generated.
-					// For instance mouse click in chrome/windows.
-					if (!dx && !dy
-						&& typeof e.movementX == 'undefined'
-						&& typeof e.mozMovementX == 'undefined'
-						&& typeof e.webkitMovementY == 'undefined'
-					) {
-						dx = x - offset.left - wdi.VirtualMouse.lastMousePosition.x;
-						dy = y - offset.top - wdi.VirtualMouse.lastMousePosition.y;
+					var dx, dy;
+					if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
+						// pointer lock active with non-zero movement: use the movement deltas
+						dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
+						dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
+					} else {
+						// otherwise: compute the delta from the absolute position (works without pointer lock)
+						dx = ax - wdi.VirtualMouse.lastMousePosition.x;
+						dy = ay - wdi.VirtualMouse.lastMousePosition.y;
 					}
-					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, self.effectiveMouseMode()]);
+					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
 				}
 				event.preventDefault();
 			});
@@ -637,7 +633,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	updateMousePointer: function() {
 		if(this.eventLayer != null) {
-			if(this.effectiveMouseMode() == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+			if(this.clientCursorVisible || this.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
 				console.log("Setting cursor to default")
 				$(this.eventLayer).css('cursor', 'default');
 				this.releasePointer();
@@ -651,7 +647,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	setClientCursorVisible: function(visible) {
 		this.clientCursorVisible = visible;
 		if (visible) {
-			// behave as absolute (CLIENT) mouse from now on; ignore capture state
+			// show a visible cursor and skip pointer capture while the fallback is active
 			this.triedCapturingPointer = false;
 		}
 		this.updateMousePointer();
@@ -660,14 +656,6 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	toggleClientCursor: function() {
 		this.setClientCursorVisible(!this.clientCursorVisible);
 		return this.clientCursorVisible;
-	},
-
-	effectiveMouseMode: function() {
-		// Client-cursor fallback: force absolute (CLIENT) mouse behavior so the
-		// visible cursor tracks the pointer and the pointer lock isn't engaged.
-		return this.clientCursorVisible
-			? wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT
-			: this.mouse_mode;
 	},
 
 	handleKey: function(e) {

@@ -179,7 +179,7 @@ function toggleClientCursor() {
 function updateCursorButton(visible) {
     var btn = document.getElementById("cursortoggle");
     if (btn) {
-        btn.textContent = visible ? "Cursor: on" : "Cursor: off";
+        btn.textContent = visible ? "Fallback cursor: on" : "Fallback cursor: off";
         btn.style.backgroundColor = visible ? "#2e7d32" : "";
     }
 }
