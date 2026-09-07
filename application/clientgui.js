@@ -527,11 +527,11 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			});
 
 			eventLayer['mousemove'](function(event) {
-				var x = event.pageX;
-				var y = event.pageY;
-				var offset = $(this).offset();
-				var ax = x - offset.left;
-				var ay = y - offset.top;
+				var rect = this.getBoundingClientRect();
+				var scaleX = this.width / rect.width;
+				var scaleY = this.height / rect.height;
+				var ax = (event.clientX - rect.left) * scaleX;
+				var ay = (event.clientY - rect.top) * scaleY;	
 				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
 					// guest in absolute (client) mode: send the absolute position
 					self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
