@@ -158,7 +158,16 @@ function start () {
 				$('#launchWordButton').prop('disabled', false);
 			}
 		} else if (action == 'resolution') {
-
+			// Echo the actual rendering surface back to the agent
+			// to force the hypervisor's mouse tablet bounds to 1:1 sync
+			if (window.lastSyncedWidth !== params[0] || window.lastSyncedHeight !== params[1]) {
+			window.lastSyncedWidth = params[0];
+			window.lastSyncedHeight = params[1];
+			app.sendCommand('setResolution', {
+				'width': params[0],
+				'height': params[1]
+			});
+			}
 		} else if (action == 'windowMinimized') {
 			//in eyeos, this should minimize the window, not close it
 			$(params.canvas).css({'display': 'none'});
