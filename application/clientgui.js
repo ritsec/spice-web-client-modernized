@@ -325,7 +325,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		
 		if (this.firstTime && this.clipboardEnabled) {
 		var self = this;
-		$(document).bind('paste', function(event) ){
+		$(document).bind('paste', function(event) {
 		self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
 		});
 		this.firstTime = false;
