@@ -248,6 +248,9 @@ function start () {
 			'width': width,
 			'height': height
 		});
+		if (app.clientGui) {
+			app.clientGui.resizeCanvasToFit();
+		}
 	});
 
 	var useWorkers = true;

@@ -311,6 +311,16 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				document.body.appendChild(cnv);
 				document.body.appendChild(evLayerWrapper);
 			}
+			
+			if(this.layer) {
+				this.layer.appendChild(cnv);
+				this.layer.appendChild(evLayerWrapper);
+			} else {
+				document.body.appendChild(cnv);
+				document.body.appendChild(evLayerWrapper);
+			}
+			
+			this.resizeCanvasToFit();
 
 			//this.enableKeyboard();
 		}
@@ -352,6 +362,25 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		this.canvasMarginX = canvasMargin.x;
 		this.canvasMarginY = canvasMargin.y;
 		$('#screen canvas').css({ 'margin-top': this.canvasMarginY + 'px' });
+	},
+	resizeCanvasToFit: function() {
+		if (this.mainCanvas === null || !this.canvas[this.mainCanvas] || !this.eventLayer) return;
+		var cnv = this.canvas[this.mainCanvas];
+		var evLayer = this.eventLayer;
+		
+		var winWidth = window.innerWidth;
+		var winHeight = window.innerHeight - this.canvasMarginY;
+		
+		var scale = Math.min(winWidth / cnv.width, winHeight / cnv.height);
+		var newWidth = Math.round(cnv.width * scale);
+		var newHeight = Math.round(cnv.height * scale);
+		
+		var cssObj = {
+			width: newWidth + 'px',
+			height: newHeight + 'px'
+		};
+		$(cnv).css(cssObj);
+		$(evLayer).css(cssObj);
 	},
 
 	createEventLayer: function(event_id, width, height) {
@@ -528,28 +557,27 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			});
 
 			eventLayer['mousemove'](function(event) {
-				var rect = this.getBoundingClientRect();
-				var ax = Math.round((event.clientX - rect.left) * (this.width / rect.width));
-				var ay = Math.round((event.clientY - rect.top) * (this.height / rect.height));
-				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
-					// guest in absolute (client) mode: send the absolute position
-					self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
-				} else if (self.clientCursorVisible || this.triedCapturingPointer) {
-					// guest in relative (server) mode: send motion deltas
-					var e = event.originalEvent;
-					var dx, dy;
-					if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
-						// pointer lock active with non-zero movement: use the movement deltas
-						dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
-						dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
-					} else {
-						// otherwise: compute the delta from the absolute position (works without pointer lock)
-						dx = ax - wdi.VirtualMouse.lastMousePosition.x;
-						dy = ay - wdi.VirtualMouse.lastMousePosition.y;
-					}
-					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
+			var rect = this.getBoundingClientRect();
+			var scaleX = this.width / rect.width;
+			var scaleY = this.height / rect.height;
+			var ax = Math.round((event.clientX - rect.left) * scaleX);
+			var ay = Math.round((event.clientY - rect.top) * scaleY);
+			
+			if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+				self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
+			} else if (self.clientCursorVisible || this.triedCapturingPointer) {
+				var e = event.originalEvent;
+				var dx, dy;
+				if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
+					dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
+					dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
+				} else {
+					dx = ax - wdi.VirtualMouse.lastMousePosition.x;
+					dy = ay - wdi.VirtualMouse.lastMousePosition.y;
 				}
-				event.preventDefault();
+				self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
+			}
+			event.preventDefault()
 			});
 
 			eventLayer.bind('contextmenu', function(event) {
