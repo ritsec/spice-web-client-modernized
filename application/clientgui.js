@@ -271,80 +271,70 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	drawCanvas: function(spiceMessage) {
 		var surface = spiceMessage.args;
 		var cnv = wdi.GlobalPool.create('Canvas');
-		cnv.keepAlive = true; //prevent this canvas to return to the pool by packetfilter
-
+		cnv.keepAlive = true; 
+		
 		cnv.id = 'canvas_' + surface.surface_id;
 		cnv.width = surface.width;
 		cnv.height = surface.height;
 		cnv.style.display = 'block';
-		cnv.style.margin = 'auto';
-		cnv.style["margin-top"] = this.canvasMarginY + 'px';
+		cnv.style.position = 'absolute';
+		cnv.style.top = '0';
+		cnv.style.left = '0';
+		cnv.style.width = '100%';
+		cnv.style.height = '100%';
 		cnv.style.zIndex = '0';
-		cnv.style.width = '';  // Force fallback to HTML width
-		cnv.style.height = ''; // Force fallback to HTML height
-
+		
 		this.canvas[surface.surface_id] = cnv;
 		this.contexts[surface.surface_id] = cnv.getContext('2d');
-
+		
 		if (surface.flags && !wdi.SeamlessIntegration) {
-			this.mainCanvas = surface.surface_id;
-
-			this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
-			this.updateMousePointer()
-
-			var evLayer = $(this.eventLayer).css({
-				display: 'block',
-				margin: 'auto',
-				'margin-top': this.canvasMarginY + 'px',
-				width: '',
-				height: '',
-			})[0];
-
-			var evLayerWrapper = $('<div id="eventLayerWrapper"></div>').css({
-				position: 'absolute',
-				top: '0',
-				left: 0,
-			    width: '100%',
-			    height: '100%',
-			    zIndex: '0'
-			})[0];
-			evLayerWrapper.appendChild(evLayer);
-
-			if(this.layer) {
-				this.layer.appendChild(cnv);
-				this.layer.appendChild(evLayerWrapper);
-			} else {
-				document.body.appendChild(cnv);
-				document.body.appendChild(evLayerWrapper);
-			}
-			
-			if(this.layer) {
-				this.layer.appendChild(cnv);
-				this.layer.appendChild(evLayerWrapper);
-			} else {
-				document.body.appendChild(cnv);
-				document.body.appendChild(evLayerWrapper);
-			}
-			
-			this.resizeCanvasToFit();
-
-			//this.enableKeyboard();
+		this.mainCanvas = surface.surface_id;
+		
+		this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
+		this.updateMousePointer();
+		
+		var evLayer = $(this.eventLayer).css({
+		display: 'block',
+		position: 'absolute',
+		top: '0',
+		left: '0',
+		width: '100%',
+		height: '100%',
+		zIndex: '1'
+		})[0];
+		
+		if(this.layer) {
+		// Apply dimensions and centering to the parent #screen div
+		$(this.layer).css({
+			position: 'relative',
+			margin: '0 auto',
+			marginTop: this.canvasMarginY + 'px',
+			width: surface.width + 'px',
+			height: surface.height + 'px'
+		});
+		this.layer.appendChild(cnv);
+		this.layer.appendChild(evLayer);
+		} else {
+		document.body.appendChild(cnv);
+		document.body.appendChild(evLayer);
 		}
-
-		//this goes here?
+		
+		// Auto-scale immediately on first load
+		this.resizeCanvasToFit();
+		}
+		
 		if (this.firstTime && this.clipboardEnabled) {
-			var self = this;
-			$(document).bind('paste', function(event) {
-				self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
-			});
-			this.firstTime = false;
+		var self = this;
+		$(document).bind('paste', function(event) ){
+		self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
+		});
+		this.firstTime = false;
 		}
-
-
-		//notify about resolution
+		
 		if (surface.flags) {
-			this.fire('resolution', [this.canvas[surface.surface_id].width, this.canvas[surface.surface_id].height]);
-		}
+		this.fire('resolution', [this.canvas[surface.surface_id].width, this.canvas[surface.surface_id].height]);
+		}	
+
 	},
 
 	disableKeyboard: function() {
@@ -372,7 +362,6 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	resizeCanvasToFit: function() {
 		if (this.mainCanvas === null || !this.canvas[this.mainCanvas] || !this.eventLayer) return;
 		var cnv = this.canvas[this.mainCanvas];
-		var evLayer = this.eventLayer;
 		
 		var winWidth = window.innerWidth;
 		var winHeight = window.innerHeight - this.canvasMarginY;
@@ -381,12 +370,10 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		var newWidth = Math.round(cnv.width * scale);
 		var newHeight = Math.round(cnv.height * scale);
 		
-		var cssObj = {
+		$(this.layer).css({
 			width: newWidth + 'px',
 			height: newHeight + 'px'
-		};
-		$(cnv).css(cssObj);
-		$(evLayer).css(cssObj);
+		});
 	},
 
 	createEventLayer: function(event_id, width, height) {
