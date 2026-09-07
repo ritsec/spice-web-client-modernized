@@ -259,7 +259,9 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		var surface = spiceMessage.args;
 		if (surface.surface_id === this.mainCanvas) {
 			$(this.eventLayer).remove();
+			$('#eventLayerWrapper').remove(); // Destroy the stale wrapper
 			this.eventLayer = null;
+
 		}
 
 		this.canvas[surface.surface_id].keepAlive = false;
@@ -270,77 +272,74 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	drawCanvas: function(spiceMessage) {
 		var surface = spiceMessage.args;
 		var cnv = wdi.GlobalPool.create('Canvas');
-		cnv.keepAlive = true; //prevent this canvas to return to the pool by packetfilter
-
+		cnv.keepAlive = true; 
+		
 		cnv.id = 'canvas_' + surface.surface_id;
 		cnv.width = surface.width;
 		cnv.height = surface.height;
-		cnv.style.display = 'block';
-		cnv.style.margin = 'auto';
-		cnv.style["margin-top"] = this.canvasMarginY + 'px';
-		cnv.style.zIndex = '0';
-
+		
 		this.canvas[surface.surface_id] = cnv;
 		this.contexts[surface.surface_id] = cnv.getContext('2d');
-
+		
 		if (surface.flags && !wdi.SeamlessIntegration) {
-			this.mainCanvas = surface.surface_id;
-
-			this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
-			this.updateMousePointer()
-
-			var evLayer = $(this.eventLayer).css({
-				display: 'block',
-				margin: 'auto',
-				'margin-top': this.canvasMarginY + 'px'
-			})[0];
-
-			var evLayerWrapper = $('<div id="eventLayerWrapper"></div>').css({
-				position: 'absolute',
-				top: '0',
-			    width: '100%',
-			    height: '100%',
-			    zIndex: '0'
-			})[0];
-			evLayerWrapper.appendChild(evLayer);
-
-			if(this.layer) {
-				this.layer.appendChild(cnv);
-				this.layer.appendChild(evLayerWrapper);
-			} else {
-				document.body.appendChild(cnv);
-				document.body.appendChild(evLayerWrapper);
-			}
-			
-			if(this.layer) {
-				this.layer.appendChild(cnv);
-				this.layer.appendChild(evLayerWrapper);
-			} else {
-				document.body.appendChild(cnv);
-				document.body.appendChild(evLayerWrapper);
-			}
-			
-			this.resizeCanvasToFit();
-
-			//this.enableKeyboard();
+		this.mainCanvas = surface.surface_id;
+		
+		// Clean up any dangling wrappers
+		$('#eventLayerWrapper').remove();
+		
+		this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
+		this.updateMousePointer();
+		
+		// 1. Create a perfectly sized relative container that centers itself
+		var evLayerWrapper = $('<div id="eventLayerWrapper"></div>').css({
+		position: 'relative',
+		width: surface.width + 'px',
+		height: surface.height + 'px',
+		margin: this.canvasMarginY + 'px auto 0 auto'
+		})[0];
+		
+		// 2. Make both canvases absolute inside it so they overlap flawlessly
+		$(cnv).css({
+		display: 'block',
+		position: 'absolute',
+		top: '0',
+		left: '0',
+		margin: '0',
+		zIndex: '0'
+		});
+		
+		var evLayer = $(this.eventLayer).css({
+		display: 'block',
+		position: 'absolute',
+		top: '0',
+		left: '0',
+		margin: '0',
+		zIndex: '1'
+		})[0];
+		
+		evLayerWrapper.appendChild(cnv);
+		evLayerWrapper.appendChild(evLayer);
+		
+		if(this.layer) {
+			this.layer.appendChild(evLayerWrapper);
+		} else {
+			document.body.appendChild(evLayerWrapper);
 		}
-
-		//this goes here?
+		}
+		
 		if (this.firstTime && this.clipboardEnabled) {
 			var self = this;
 			$(document).bind('paste', function(event) {
-				self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
-			});
-			this.firstTime = false;
+			self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
+		});
+		this.firstTime = false;
 		}
-
-
+		
 		//notify about resolution
 		if (surface.flags) {
 			this.fire('resolution', [this.canvas[surface.surface_id].width, this.canvas[surface.surface_id].height]);
 		}
 	},
-
 	disableKeyboard: function() {
 		var documentDOM = window.$(window.document);
 		documentDOM.unbind('keydown', this.handleKey);
