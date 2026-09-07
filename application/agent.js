@@ -60,6 +60,8 @@ wdi.Agent = $.spcExtend(wdi.EventObject.prototype, {
         if (this.clipboardEnabled) {
             mycaps = mycaps | (1 << wdi.AgentCaps.VD_AGENT_CAP_CLIPBOARD_BY_DEMAND);
         }
+	// Force spice-vdagent to handle absolute pixels, bypassing QEMU tablet scaling
+	mycaps = mycaps | (1 << 0); // Bit 0 is VD_AGENT_CAP_MOUSE_STATE
 
         packet = new wdi.SpiceMessage({
             messageType: wdi.SpiceVars.SPICE_MSGC_MAIN_AGENT_DATA,
