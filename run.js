@@ -228,6 +228,13 @@ function start () {
 				height -= 40;
 			}
 		}
+		// Prevent QXL 16MB VRAM exhaustion by capping pixels
+		var maxPixels = 2500000; // ~10MB at 32bpp
+		if (width * height > maxPixels) {
+			var ratio = Math.sqrt(maxPixels / (width * height));
+			width = Math.floor(width * ratio);
+			height = Math.floor(height * ratio);
+		}
 		app.sendCommand('setResolution', {
 			'width': width,
 			'height': height
