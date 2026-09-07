@@ -259,6 +259,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		var surface = spiceMessage.args;
 		if (surface.surface_id === this.mainCanvas) {
 			$(this.eventLayer).remove();
+			$('#eventLayerWrapper').remove(); // Destroy the orphaned wrapper
 			this.eventLayer = null;
 		}
 
@@ -279,6 +280,8 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		cnv.style.margin = 'auto';
 		cnv.style["margin-top"] = this.canvasMarginY + 'px';
 		cnv.style.zIndex = '0';
+		cnv.style.width = '';  // Force fallback to HTML width
+		cnv.style.height = ''; // Force fallback to HTML height
 
 		this.canvas[surface.surface_id] = cnv;
 		this.contexts[surface.surface_id] = cnv.getContext('2d');
@@ -292,12 +295,15 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			var evLayer = $(this.eventLayer).css({
 				display: 'block',
 				margin: 'auto',
-				'margin-top': this.canvasMarginY + 'px'
+				'margin-top': this.canvasMarginY + 'px',
+				width: '',
+				height: '',
 			})[0];
 
 			var evLayerWrapper = $('<div id="eventLayerWrapper"></div>').css({
 				position: 'absolute',
 				top: '0',
+				left: 0,
 			    width: '100%',
 			    height: '100%',
 			    zIndex: '0'
