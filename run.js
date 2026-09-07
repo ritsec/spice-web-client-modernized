@@ -158,16 +158,30 @@ function start () {
 				$('#launchWordButton').prop('disabled', false);
 			}
 		} else if (action == 'resolution') {
-			// Echo the actual rendering surface back to the agent
-			// to force the hypervisor's mouse tablet bounds to 1:1 sync
-			if (window.lastSyncedWidth !== params[0] || window.lastSyncedHeight !== params[1]) {
-			window.lastSyncedWidth = params[0];
-			window.lastSyncedHeight = params[1];
-			app.sendCommand('setResolution', {
-				'width': params[0],
-				'height': params[1]
-			});
+		var vmWidth = params[0];
+			var vmHeight = params[1];
+			var winWidth = $(window).width();
+			var winHeight = $(window).height();
+			
+			var login = document.getElementById("login");
+			if (login != null && login.className == "") {
+				winHeight -= 40;
 			}
+			
+			// Calculate a uniform scale to fit the window exactly
+			var scale = Math.min(winWidth / vmWidth, winHeight / vmHeight);
+			var cssWidth = Math.round(vmWidth * scale) + 'px';
+			var cssHeight = Math.round(vmHeight * scale) + 'px';
+			
+			// Apply the scaled dimensions to both the display and the mouse layer
+			$('canvas[id^="canvas_"]').css({
+				'width': cssWidth,
+				'height': cssHeight
+			});
+			$('#eventLayer').css({
+				'width': cssWidth,
+				'height': cssHeight
+			});
 		} else if (action == 'windowMinimized') {
 			//in eyeos, this should minimize the window, not close it
 			$(params.canvas).css({'display': 'none'});
