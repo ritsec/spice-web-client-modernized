@@ -365,9 +365,10 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				height: height
 			});
 
-		if (window['bowser']['firefox']) {
-			eventLayer.attr('contentEditable', true);
-		}
+// Potentially related to a firefox-specific cursor issue?
+//		if (window['bowser']['firefox']) {
+//			eventLayer.attr('contentEditable', true);
+//		}
 
 		if ("onpointerlockchange" in document) {
 			document.addEventListener('pointerlockchange', lockChangeAlert, false);
@@ -528,10 +529,8 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 			eventLayer['mousemove'](function(event) {
 				var rect = this.getBoundingClientRect();
-				var scaleX = this.width / rect.width;
-				var scaleY = this.height / rect.height;
-				var ax = (event.clientX - rect.left) * scaleX;
-				var ay = (event.clientY - rect.top) * scaleY;	
+				var ax = Math.round((event.clientX - rect.left) * (this.width / rect.width));
+				var ay = Math.round((event.clientY - rect.top) * (this.height / rect.height));
 				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
 					// guest in absolute (client) mode: send the absolute position
 					self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
