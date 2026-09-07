@@ -550,29 +550,36 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			});
 
 			eventLayer['mousemove'](function(event) {
+			var e = event.originalEvent;
 			var rect = this.getBoundingClientRect();
+			
+			// Use floating-point rect dimensions for perfect scale math
 			var scaleX = this.width / rect.width;
 			var scaleY = this.height / rect.height;
-			var ax = Math.round((event.clientX - rect.left) * scaleX);
-			var ay = Math.round((event.clientY - rect.top) * scaleY);
+			
+			// Native offsetX/Y cleanly bypasses getBoundingClientRect layout bugs in Firefox.
+			// Fallbacks included just in case.
+			var offX = e.offsetX !== undefined ? e.offsetX : (event.clientX - rect.left);
+			var offY = e.offsetY !== undefined ? e.offsetY : (event.clientY - rect.top);
+			
+			var ax = Math.round(offX * scaleX);
+			var ay = Math.round(offY * scaleY);
 			
 			if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
-				self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
+			self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
 			} else if (self.clientCursorVisible || this.triedCapturingPointer) {
-				var e = event.originalEvent;
-				var dx, dy;
-				if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
-					dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
-					dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
-				} else {
-					dx = ax - wdi.VirtualMouse.lastMousePosition.x;
-					dy = ay - wdi.VirtualMouse.lastMousePosition.y;
-				}
-				self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
+			var dx, dy;
+			if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
+				dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
+				dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
+			} else {
+				dx = ax - wdi.VirtualMouse.lastMousePosition.x;
+				dy = ay - wdi.VirtualMouse.lastMousePosition.y;
+			}
+			self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
 			}
 			event.preventDefault()
 			});
-
 			eventLayer.bind('contextmenu', function(event) {
 				event.preventDefault();
 				return false;
