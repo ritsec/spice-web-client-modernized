@@ -145,6 +145,9 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 		//so the packet is not executed until the previous packets
 		//finished processing
 		this.runQ.add(function(proxy) {
+			if (wdi.NetStats.enabled) {
+				wdi.NetStats.recordDrawStart(spiceMessage);
+			}
 
 			//pass the message through the packet filter
 			//so the packet can be filtered, logged, etc

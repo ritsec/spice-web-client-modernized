@@ -154,6 +154,48 @@ suite('NetStats', function() {
 		assert.deepEqual(sut.getSnapshot().acks, {count: 2, fallback: 1});
 	});
 
+	test('averages decode and draw times on the message row, including messages from before a reset', function() {
+		var QUIC = wdi.SpiceImageType.SPICE_IMAGE_TYPE_QUIC;
+		var early = drawPacket(box(0, 0, 10, 10), QUIC);
+		sut.recordDisplayMessage(DRAW_COPY, 1000, early);
+		sut.reset();
+		var late = drawPacket(box(0, 0, 10, 10), QUIC);
+		sut.recordDisplayMessage(DRAW_COPY, 1000, late);
+
+		sut.recordDecode(early, 10, 1000000);
+		sut.recordDecode(late, 30, 1000000);
+		time = 100;
+		sut.recordDrawStart(late);
+		time = 104;
+		sut.recordDrawDone(late);
+
+		var row = sut.getSnapshot().display[0];
+		assert.equal(row.message, 'DRAW_COPY quic');
+		assert.equal(row.count, 1);
+		assert.equal(row['decode ms'], 20);
+		assert.equal(row['decode ms/MP'], 20);
+		assert.equal(row['draw ms'], 4);
+	});
+
+	test('report prints everything as one console.log block', function() {
+		sut.recordReceived(wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, 1000);
+		sut.recordDisplayMessage(DRAW_COPY, 1000, drawPacket(box(0, 0, 10, 10)));
+		var log = sinon.stub(console, 'log');
+		var table = sinon.stub(console, 'table');
+		try {
+			sut.report();
+			assert.isTrue(log.calledOnce);
+			var text = log.firstCall.args[0];
+			assert.include(text, 'recv kB/s');
+			assert.include(text, 'DRAW_COPY');
+			assert.include(text, 'arrival->drawn');
+			assert.isFalse(table.called);
+		} finally {
+			log.restore();
+			table.restore();
+		}
+	});
+
 	test('report prints one line when there was no traffic', function() {
 		var log = sinon.stub(console, 'log');
 		var table = sinon.stub(console, 'table');

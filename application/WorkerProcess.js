@@ -43,13 +43,25 @@ window['wdi'].WorkerOperations = {
 	quic: 0,
 	lz_rgb: 1,
 	bytesToUriJpeg: 2,
-	bytesToUriPng: 3
+	bytesToUriPng: 3,
+	imageBitmap: 4
+};
+
+// Reverses the row order of an RGBA buffer in place.
+window['wdi'].flipImageRows = function(buffer, width, height) {
+	var rowBytes = width * 4;
+	var pixels = new Uint8Array(buffer);
+	var row = new Uint8Array(rowBytes);
+	for (var top = 0, bottom = (height - 1) * rowBytes; top < bottom; top += rowBytes, bottom -= rowBytes) {
+		row.set(pixels.subarray(top, top + rowBytes));
+		pixels.copyWithin(top, bottom, bottom + rowBytes);
+		pixels.set(row, bottom);
+	}
 };
 
 function dispatch(arr, useMessage) {
 
 	var u8 = new Uint8Array(arr);
-	var postMessageW3CCompilant = u8[3];
 
 
 	var result = null;
@@ -64,9 +76,23 @@ function dispatch(arr, useMessage) {
 	} else if (operation === wdi.WorkerOperations.lz_rgb) { //lz?
 		try {
 			result = wdi.LZSS.lz_rgb32_decompress_rgb(arr);
+			// The decoder already reverses opaque bottom-up images. Flip the rest here,
+			// so every caller gets top-down pixels. u8[1] is opaque, u8[3] is top_down.
+			if (result && !u8[1] && !u8[3]) {
+				var view = new DataView(arr);
+				wdi.flipImageRows(result, view.getUint32(8), view.getUint32(12));
+			}
 		} catch (e) {
 
 		}
+	} else if (operation === wdi.WorkerOperations.imageBitmap) {
+		// Decode JPEG with the browser's native decoder, off the main thread.
+		createImageBitmap(new Blob([u8.subarray(4)], {type: 'image/jpeg'})).then(function(bitmap) {
+			self.postMessage(bitmap, [bitmap]);
+		}, function() {
+			self.postMessage(null);
+		});
+		return;
 	} else if (operation === wdi.WorkerOperations.bytesToUriJpeg) {
 		try {
 			result = bytesToURI(u8, 'jpeg');
@@ -84,14 +110,14 @@ function dispatch(arr, useMessage) {
 
 		}
 	}
-	if (useMessage && result) {
-
-		if (postMessageW3CCompilant) {
+	if (useMessage) {
+		// Transfer instead of copying the pixels. Answer failures too, or the display
+		// queue waits for this image forever.
+		if (result) {
 			self.postMessage(result, [result]);
 		} else {
-			self.postMessage(result);
+			self.postMessage(null);
 		}
-
 	} else {
 		return result;
 	}
@@ -100,9 +126,13 @@ function dispatch(arr, useMessage) {
 
 window['workerDispatch'] = dispatch;
 
-self.addEventListener('message', function(e) {
-	return dispatch(e.data, true);
-}, false);
+// This file is also loaded on the page for synchronous decoding. Only listen inside
+// a real worker, or every window message would run a decode and post back to the window.
+if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+	self.addEventListener('message', function(e) {
+		return dispatch(e.data, true);
+	}, false);
+}
 
 
 

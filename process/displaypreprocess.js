@@ -27,7 +27,10 @@ wdi.DisplayPreProcess = $.spcExtend(wdi.EventObject.prototype, {
 		http://www.w3.org/2012/sysapps/device-capabilities/#cpu
 
 		**/
-		if(c.numConsumers == null || c.numConsumers == undefined) c.numConsumers = 4;
+		// One decode worker per spare core, leaving one for the main thread, between 2 and 8.
+		if(c.numConsumers == null || c.numConsumers == undefined) {
+			c.numConsumers = Math.max(2, Math.min((navigator.hardwareConcurrency || 4) - 1, 8));
+		}
 		var numConsumers = c.numConsumers;
 
 		for(var i = 0;i<numConsumers; i++) {

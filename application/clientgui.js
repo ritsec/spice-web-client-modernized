@@ -270,8 +270,12 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	drawCanvas: function(spiceMessage) {
 		var surface = spiceMessage.args;
-		var cnv = wdi.GlobalPool.create('Canvas');
-		cnv.keepAlive = true; 
+		// The primary surface is opaque, so the browser can skip alpha blending, and it
+		// asks for low-latency drawing where supported. It gets a fresh canvas, because
+		// a pooled one may already have a default context and would ignore these options.
+		var isPrimary = surface.flags && !wdi.SeamlessIntegration;
+		var cnv = isPrimary ? document.createElement('canvas') : wdi.GlobalPool.create('Canvas');
+		cnv.keepAlive = true;
 		
 		cnv.id = 'canvas_' + surface.surface_id;
 		cnv.width = surface.width;
@@ -285,9 +289,10 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		cnv.style.zIndex = '0';
 		
 		this.canvas[surface.surface_id] = cnv;
-		this.contexts[surface.surface_id] = cnv.getContext('2d');
-		
-		if (surface.flags && !wdi.SeamlessIntegration) {
+		this.contexts[surface.surface_id] = isPrimary ?
+			cnv.getContext('2d', {alpha: false, desynchronized: true}) : cnv.getContext('2d');
+
+		if (isPrimary) {
 		this.mainCanvas = surface.surface_id;
 		
 		this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);

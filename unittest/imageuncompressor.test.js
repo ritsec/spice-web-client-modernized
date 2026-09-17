@@ -192,3 +192,52 @@ suite("Image uncompressor suite", function () {
 		assert.equal(result.imageData[0], expected, "header not extracted correctly from imageData");
 	}));
 });
+
+suite('wdi.flipImageRows', function() {
+	test('reverses row order in place for odd and even heights', function() {
+		var rows = function(values) {
+			return new Uint8Array(values.reduce(function(all, value) {
+				return all.concat([value, value, value, value]);
+			}, [])).buffer;
+		};
+		var firstChannel = function(buffer) {
+			return Array.prototype.filter.call(new Uint8Array(buffer), function(value, i) {
+				return i % 4 === 0;
+			});
+		};
+
+		var odd = rows([1, 2, 3]);
+		wdi.flipImageRows(odd, 1, 3);
+		assert.deepEqual(firstChannel(odd), [3, 2, 1]);
+
+		var even = rows([1, 2, 3, 4]);
+		wdi.flipImageRows(even, 1, 4);
+		assert.deepEqual(firstChannel(even), [4, 3, 2, 1]);
+	});
+});
+
+suite('workerDispatch LZ', function() {
+	test('flips only images that are neither opaque nor top-down', function() {
+		// Two 1-pixel rows whose first bytes are 1 and 2, as the decoder would return them.
+		var decode = sinon.stub(wdi.LZSS, 'lz_rgb32_decompress_rgb', function() {
+			return new Uint8Array([1, 1, 1, 1, 2, 2, 2, 2]).buffer;
+		});
+		var firstRow = function(opaque, topDown) {
+			var arr = new ArrayBuffer(16);
+			var u8 = new Uint8Array(arr);
+			u8[0] = wdi.WorkerOperations.lz_rgb;
+			u8[1] = opaque;
+			u8[3] = topDown;
+			new DataView(arr).setUint32(8, 1);
+			new DataView(arr).setUint32(12, 2);
+			return new Uint8Array(window.workerDispatch(arr, false))[0];
+		};
+		try {
+			assert.equal(firstRow(0, 0), 2, 'non-opaque bottom-up image should be flipped');
+			assert.equal(firstRow(0, 1), 1, 'top-down image should not be flipped');
+			assert.equal(firstRow(1, 0), 1, 'opaque images are reversed by the decoder itself');
+		} finally {
+			decode.restore();
+		}
+	});
+});

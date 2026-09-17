@@ -80,49 +80,4 @@ suite("Graphic suite", function () {
 	test('processLz returns an imageData', sinon.test(function() {
 		testFunctionsReturnsImageData('processLz', this);
 	}));
-
-	function testFlip (self, processResult) {
-		processResult = processResult || new ArrayBuffer(imageDescriptor.width * imageDescriptor.height * 4);
-		var imageUncompressor = new wdi.ImageUncompressor();
-		var imageUncompressorStub = self.stub(imageUncompressor, 'process',
-			function(imageDescriptor, imageData, brush, opaque, clientGui, callback, scope) {
-				callback.call(scope, processResult);
-		});
-
-		var imageUncompressorStub2 = self.stub(imageUncompressor, 'extractLzHeader').returns({
-			header: header,
-			imageData: 'an image Data'
-		});
-
-		var getInstanceStub = self.stub(wdi.ImageUncompressor, 'getSyncInstance')
-			.returns(imageUncompressor);
-
-		sut.processLz(imageDescriptor, imageData, brush, opaque, clientGui);
-	}
-
-	test('processLz flips the image if topDown falsy in header', sinon.test(function () {
-		header.top_down = false;
-
-		var flipStub = this.stub(sut, 'imageFlip');
-		var processResult = new ArrayBuffer(imageDescriptor.width * imageDescriptor.height * 4);
-
-		testFlip(this, processResult);
-
-		var u8 = new Uint8Array(processResult);
-		var source_img = clientGui.getContext(0).createImageData(imageDescriptor.width, imageDescriptor.height);
-		source_img.data.set(u8);
-
-		sinon.assert.calledWithExactly(flipStub, source_img);
-
-	}));
-
-	test('processLz never flips the image if topDown truthy in header', sinon.test(function () {
-		header.top_down = true;
-
-		var flipStub = this.stub(sut, 'imageFlip');
-
-		testFlip(this);
-
-		sinon.assert.notCalled(flipStub);
-	}));
 });
