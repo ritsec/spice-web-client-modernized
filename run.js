@@ -69,6 +69,10 @@ function translate() {
 function start () {
 	var testSessionStarted = false;
 
+	if (getURLParameter('netstats')) {
+		wdi.NetStats.start();
+	}
+
 	translate();
 
 	$('#getStats').click(function() {

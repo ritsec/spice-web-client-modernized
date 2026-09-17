@@ -31,9 +31,51 @@ must display the words "Powered by eyeos" and retain the original copyright noti
  */
 //Must fire event types: connectionId and message
 
+// ACK owed for a display message, sent once that message has been drawn.
+// ACKing after drawing instead of on arrival lets spice-server see when the
+// client falls behind, so it can skip frames that newer frames cover.
+wdi.DeferredAck = $.spcExtend(wdi.DomainObject, {
+	channel: null,
+	generation: 0,
+	timer: null,
+
+	init: function(c) {
+		this.channel = c.channel;
+		this.generation = c.channel.ackGeneration;
+		var self = this;
+		this.timer = setTimeout(function() {
+			self.send(true);
+		}, wdi.DeferredAck.timeoutMs);
+	},
+
+	send: function(isFallback) {
+		if (!this.channel) {
+			return;
+		}
+		clearTimeout(this.timer);
+		var channel = this.channel;
+		this.channel = null;
+		// A SET_ACK or disconnect since this token was made means the server
+		// no longer expects this ACK.
+		if (this.generation !== channel.ackGeneration) {
+			return;
+		}
+		if (isFallback === true) {
+			console.warn('SpiceChannel: display message not drawn after ' + wdi.DeferredAck.timeoutMs + ' ms, sending its ACK anyway');
+		}
+		channel.sendAck();
+		if (wdi.NetStats.enabled) {
+			wdi.NetStats.recordAck(isFallback === true);
+		}
+	}
+});
+
+wdi.DeferredAck.timeoutMs = 3000;
+
 wdi.SpiceChannel = $.spcExtend(wdi.EventObject.prototype, {
 	counter: 0,
 	ackWindow: 0,
+	ackGeneration: 0,
 	connectionId: 0,
 	socketQ: null,
 	packetReassembler: null,
@@ -53,6 +95,9 @@ wdi.SpiceChannel = $.spcExtend(wdi.EventObject.prototype, {
 		var date;
 		this.packetReassembler.addListener('packetComplete', function(e) {
 			var rawMessage = e;
+			if (wdi.NetStats.enabled) {
+				wdi.NetStats.recordReceived(this.channel, rawMessage.data.length);
+			}
 			if (rawMessage.status === 'spicePacket') {
 				if (wdi.logOperations) {
 					wdi.DataLogger.logNetworkTime();
@@ -108,10 +153,14 @@ wdi.SpiceChannel = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	disconnect: function () {
+		this.ackGeneration++;
 		this.socketQ.disconnect();
 	},
 
 	send: function(data, flush) {
+		if (wdi.NetStats.enabled) {
+			wdi.NetStats.recordSent(this.channel, data.length);
+		}
 		this.socketQ.send(data, flush);
 	},
 
@@ -129,6 +178,22 @@ wdi.SpiceChannel = $.spcExtend(wdi.EventObject.prototype, {
 	setAckWindow: function(window) {
 		this.ackWindow = window;
 		this.counter = 0;
+		this.ackGeneration++;
+	},
+
+	sendAck: function() {
+		var ack = new wdi.SpiceDataHeader({
+			type: wdi.SpiceVars.SPICE_MSGC_ACK,
+			size:0
+		}).marshall();
+		this.send(ack);
+	},
+
+	// Background tabs throttle timers, and a client that stops ACKing makes
+	// spice-server stop reading guest draw commands, so only defer while visible.
+	shouldDeferAck: function() {
+		return this.channel === wdi.SpiceVars.SPICE_CHANNEL_DISPLAY &&
+			!(typeof document !== 'undefined' && document.hidden);
 	},
 
 	getRawSpiceMessage: function (rawData) {
@@ -144,23 +209,30 @@ wdi.SpiceChannel = $.spcExtend(wdi.EventObject.prototype, {
 
 		this.counter++;
 
+		var ackDue = false;
 		if(this.ackWindow && this.counter === this.ackWindow) {
 			this.counter = 0;
-			var ack = new wdi.SpiceDataHeader({
-				type: wdi.SpiceVars.SPICE_MSGC_ACK,
-				size:0
-			}).marshall();
-			this.send(ack);
+			ackDue = true;
 		}
 
 		var packet = wdi.PacketLinkFactory.extract(headerObj, body) || false;
 		if (packet) {
+			if (ackDue) {
+				this.sendAck();
+			}
 			wdi.PacketLinkProcess.process(headerObj, packet, this);
 			wdi.GlobalPool.discard('ViewQueue', body);
 			return false;
 		} else {
 			var rawSpiceMessage = wdi.GlobalPool.create('RawSpiceMessage');
 			rawSpiceMessage.set(headerObj, body, this.channel);
+			if (ackDue) {
+				if (this.shouldDeferAck()) {
+					rawSpiceMessage.ackToken = new wdi.DeferredAck({channel: this});
+				} else {
+					this.sendAck();
+				}
+			}
 			return rawSpiceMessage;
 		}
 	},
