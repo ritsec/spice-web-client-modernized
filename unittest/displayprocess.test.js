@@ -95,5 +95,46 @@ suite('DisplayProcess', function() {
 				.once();
 			sut._process(false);
 		}));
+
+		test('processEnd sends the ACK carried by the message', function() {
+			var message = {ackToken: {send: sinon.spy()}};
+			sut.processEnd(message, fakeClientGui);
+			assert.isTrue(message.ackToken.send.calledOnce);
+		});
+
+		test('removeRedundantDraws sends the ACK of a draw it drops', function() {
+			var fakeDraw = function(box, ackToken) {
+				return {
+					messageType: wdi.SpiceVars.SPICE_MSG_DISPLAY_DRAW_COPY,
+					ackToken: ackToken,
+					args: {
+						base: {surface_id: 0, box: box, clip: {type: 0}},
+						rop_descriptor: wdi.SpiceRopd.SPICE_ROPD_OP_PUT,
+						getMessageProperty: function(name, defaultValue) {
+							return name === 'overWriteScreenArea' ? true : defaultValue;
+						}
+					}
+				};
+			};
+			var covered = fakeDraw({top: 10, left: 10, bottom: 20, right: 20}, {send: sinon.spy()});
+			var cover = fakeDraw({top: 0, left: 0, bottom: 100, right: 100}, null);
+			sut.waitingMessages = [covered, cover];
+			sut.removeRedundantDraws();
+			assert.deepEqual(sut.waitingMessages, [cover]);
+			assert.isTrue(covered.ackToken.send.calledOnce);
+		});
+
+		test('processEnd tells NetStats the message was drawn', function() {
+			var message = {};
+			var record = sinon.stub(wdi.NetStats, 'recordDrawDone');
+			wdi.NetStats.enabled = true;
+			try {
+				sut.processEnd(message, fakeClientGui);
+			} finally {
+				wdi.NetStats.enabled = false;
+				record.restore();
+			}
+			assert.isTrue(record.calledWithExactly(message));
+		});
 	});
 });

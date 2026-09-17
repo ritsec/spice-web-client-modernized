@@ -120,6 +120,13 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 
 		//itareate over messages marked for deletion and remove it from the array
 		for(x = 0;x < to_delete.length;x++) {
+			message = this.waitingMessages[to_delete[x]];
+			if (wdi.NetStats.enabled) {
+				wdi.NetStats.recordDropped(message);
+			}
+			if (message.ackToken) {
+				message.ackToken.send();
+			}
 			this.waitingMessages.splice(to_delete[x], 1);
 		}
 	},
@@ -164,7 +171,13 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	processEnd: function(spiceMessage, clientGui) {
+		if (spiceMessage && spiceMessage.ackToken) {
+			spiceMessage.ackToken.send();
+		}
 		this.packetFilter.notifyEnd(spiceMessage, clientGui);
+		if (wdi.NetStats.enabled) {
+			wdi.NetStats.recordDrawDone(spiceMessage);
+		}
 	},
 
 	postProcess: function() {

@@ -132,6 +132,118 @@ suite('SpiceChannel', function() {
 
 	});
 	
+	suite('#deferred ACKs', function() {
+		var sent, clock, extract, ack;
+
+		function receive() {
+			return sut.getRawSpiceMessage(new Uint8Array([102, 0, 0, 0, 0, 0]));
+		}
+
+		function ackCount() {
+			var expected = JSON.stringify(ack);
+			return sent.filter(function(packet) {
+				return JSON.stringify(packet) === expected;
+			}).length;
+		}
+
+		setup(function() {
+			ack = new wdi.SpiceDataHeader({type: wdi.SpiceVars.SPICE_MSGC_ACK, size: 0}).marshall();
+			sent = [];
+			clock = sinon.useFakeTimers();
+			extract = sinon.stub(wdi.PacketLinkFactory, 'extract').returns(false);
+			toRestore.push(clock, extract, sinon.stub(socketQ, 'send', function(packet) {
+				sent.push(packet);
+			}));
+			Object.defineProperty(document, 'hidden', {configurable: true, get: function() {
+				return false;
+			}});
+			sut.channel = wdi.SpiceVars.SPICE_CHANNEL_DISPLAY;
+			sut.setAckWindow(2);
+		});
+
+		teardown(function() {
+			delete document.hidden;
+		});
+
+		test('Display channel attaches an ACK token instead of sending when the window fills', function() {
+			assert.isNull(receive().ackToken);
+			var message = receive();
+			assert.instanceOf(message.ackToken, wdi.DeferredAck);
+			assert.equal(ackCount(), 0);
+		});
+
+		test('The token sends one ACK no matter how often it is called', function() {
+			receive();
+			var token = receive().ackToken;
+			token.send();
+			token.send();
+			assert.equal(ackCount(), 1);
+		});
+
+		test('Other channels ACK on arrival', function() {
+			sut.channel = wdi.SpiceVars.SPICE_CHANNEL_CURSOR;
+			receive();
+			assert.isNull(receive().ackToken);
+			assert.equal(ackCount(), 1);
+		});
+
+		test('Display channel ACKs on arrival while the page is hidden', function() {
+			Object.defineProperty(document, 'hidden', {configurable: true, get: function() {
+				return true;
+			}});
+			receive();
+			assert.isNull(receive().ackToken);
+			assert.equal(ackCount(), 1);
+		});
+
+		test('A link message that fills the window ACKs on arrival', function() {
+			toRestore.push(sinon.stub(wdi.PacketLinkProcess, 'process'));
+			receive();
+			extract.returns({});
+			assert.isFalse(receive());
+			assert.equal(ackCount(), 1);
+		});
+
+		test('The fallback timer sends an ACK that was never sent', function() {
+			var warn = sinon.stub(console, 'warn');
+			toRestore.push(warn);
+			receive();
+			var token = receive().ackToken;
+			clock.tick(wdi.DeferredAck.timeoutMs - 1);
+			assert.equal(ackCount(), 0);
+			clock.tick(1);
+			assert.equal(ackCount(), 1);
+			assert.isTrue(warn.calledOnce);
+			token.send();
+			assert.equal(ackCount(), 1);
+		});
+
+		test('Sending the token cancels the fallback timer', function() {
+			receive();
+			receive().ackToken.send();
+			clock.tick(wdi.DeferredAck.timeoutMs * 2);
+			assert.equal(ackCount(), 1);
+		});
+
+		test('setAckWindow turns pending tokens into no-ops', function() {
+			receive();
+			var token = receive().ackToken;
+			sut.setAckWindow(2);
+			token.send();
+			clock.tick(wdi.DeferredAck.timeoutMs * 2);
+			assert.equal(ackCount(), 0);
+		});
+
+		test('disconnect turns pending tokens into no-ops', function() {
+			toRestore.push(sinon.stub(socketQ, 'disconnect'));
+			receive();
+			receive();
+			sut.disconnect();
+			clock.tick(wdi.DeferredAck.timeoutMs * 2);
+			assert.equal(ackCount(), 0);
+		});
+	});
+
 	suite.skip('#getRawSpiceMessage', function () {
 		test('returns a valid rawSpiceMessage', function () {
 			var data = [1, 0, 9, 0, 0, 0, 0,0,0,0,0,0,0,0,0];
@@ -174,6 +286,32 @@ suite('SpiceChannel', function() {
 			var expectation = mock.expects('disconnect').once().withExactArgs();
 			sut.disconnect();
 			expectation.verify();
+		});
+
+		test('Records bytes received and sent when NetStats is enabled', function() {
+			var received = sinon.stub(wdi.NetStats, 'recordReceived');
+			var sent = sinon.stub(wdi.NetStats, 'recordSent');
+			toRestore.push(received, sent, sinon.stub(socketQ, 'send'));
+			sut.channel = wdi.SpiceVars.SPICE_CHANNEL_DISPLAY;
+			wdi.NetStats.enabled = true;
+			try {
+				packetReassembler.fire('packetComplete', new wdi.RawMessage({status: 'unknown', data: [1, 2, 3, 4]}));
+				sut.send([1, 2, 3]);
+			} finally {
+				wdi.NetStats.enabled = false;
+			}
+			assert.isTrue(received.calledWithExactly(wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, 4));
+			assert.isTrue(sent.calledWithExactly(wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, 3));
+		});
+
+		test('Records nothing when NetStats is disabled', function() {
+			var received = sinon.stub(wdi.NetStats, 'recordReceived');
+			var sent = sinon.stub(wdi.NetStats, 'recordSent');
+			toRestore.push(received, sent, sinon.stub(socketQ, 'send'));
+			packetReassembler.fire('packetComplete', new wdi.RawMessage({status: 'unknown', data: [1, 2, 3, 4]}));
+			sut.send([1, 2, 3]);
+			assert.isFalse(received.called);
+			assert.isFalse(sent.called);
 		});
 	});
 });
