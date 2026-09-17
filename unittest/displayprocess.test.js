@@ -96,6 +96,49 @@ suite('DisplayProcess', function() {
 			sut._process(false);
 		}));
 
+		test('process draws a burst of messages in one animation frame', function() {
+			var clock = sinon.useFakeTimers();
+			var frame = sinon.stub(window, 'requestAnimationFrame').returns(1);
+			var processed = sinon.stub(sut, '_process');
+			try {
+				sut.process({args: {}});
+				sut.process({args: {}});
+				assert.isTrue(frame.calledOnce);
+				assert.isFalse(processed.called);
+
+				frame.firstCall.args[0]();
+				assert.equal(processed.callCount, 2);
+				assert.equal(sut.waitingMessages.length, 0);
+
+				clock.tick(1000);
+				assert.equal(processed.callCount, 2, 'the fallback timeout should have been cancelled');
+			} finally {
+				processed.restore();
+				frame.restore();
+				clock.restore();
+			}
+		});
+
+		test('process falls back to a timeout when no animation frame runs', function() {
+			var clock = sinon.useFakeTimers();
+			var frame = sinon.stub(window, 'requestAnimationFrame').returns(1);
+			var processed = sinon.stub(sut, '_process');
+			try {
+				sut.process({args: {}});
+				clock.tick(249);
+				assert.isFalse(processed.called);
+				clock.tick(1);
+				assert.isTrue(processed.calledOnce);
+
+				sut.process({args: {}});
+				assert.isTrue(frame.calledTwice, 'a message after a flush should schedule a new one');
+			} finally {
+				processed.restore();
+				frame.restore();
+				clock.restore();
+			}
+		});
+
 		test('processEnd sends the ACK carried by the message', function() {
 			var message = {ackToken: {send: sinon.spy()}};
 			sut.processEnd(message, fakeClientGui);
