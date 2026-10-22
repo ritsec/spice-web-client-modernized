@@ -55,6 +55,7 @@ function hideMenuBar() {
     }
 }
 function closeSession(inactivity) {
+    if (inactivityClosed) return;
     inactivityClosed = true;
     clearTimeout(inactivityTimer);
     clearTimeout(inactivityCountdownTimer);
@@ -146,6 +147,43 @@ function sendKeystroke(e) {
     app.sendKeystroke($(e).text());
     document.getElementById("inputmanager").focus();
 }
+function copyToVM() {
+    app.clientGui.copyFromHost();
+}
+
+function requestClipboardPermission() {
+    if (!(navigator.clipboard && navigator.clipboard.readText)) {
+        console.warn('Clipboard API unavailable (needs HTTPS); paste will prompt on first use');
+        return;
+    }
+    // Called from a user gesture (the Start button click), so readText() surfaces the
+    // clipboard-read permission prompt in Chromium and Firefox alike. The read value is
+    // discarded -- we only want to elicit/record the permission early.
+    navigator.clipboard.readText()
+        .then(function () { console.log('clipboard-read permission granted'); })
+        .catch(function (err) { console.warn('clipboard-read not granted yet:', err && err.name); });
+}
+
+function toggleClientCursor() {
+    // Toggle the browser's native cursor over the VM canvas. Some guests without the
+    // SPICE agent never render their own pointer; this forces a visible, usable
+    // (absolute) cursor as a fallback. Default is off -- existing mouse behavior wins.
+    var visible = false;
+    if (app && app.clientGui) {
+        visible = app.clientGui.toggleClientCursor();
+    }
+    updateCursorButton(visible);
+    return visible;
+}
+
+function updateCursorButton(visible) {
+    var btn = document.getElementById("cursortoggle");
+    if (btn) {
+        btn.textContent = visible ? "Fallback cursor: on" : "Fallback cursor: off";
+        btn.style.backgroundColor = visible ? "#2e7d32" : "";
+    }
+}
+
 
 function showKeystrokesMenu() {
     $("#keystrokes-menu").toggleClass("show");

@@ -45,12 +45,8 @@ wdi.Socket = $.spcExtend(wdi.EventObject.prototype, {
 	
 	connect: function(uri) {
 		var self = this;
-		var protocol = 'base64'; //default protocol
-		
-		if(Modernizr['websocketsbinary']) {
-			protocol = 'binary';
-			this.binary = true;
-		}
+		var protocol = 'binary'; // SPICE over websockify requires binary frames
+		this.binary = true;
 
 		this.websocket = new WebSocket(uri, protocol);
 		

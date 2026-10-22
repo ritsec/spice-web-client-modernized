@@ -1,0 +1,237 @@
+# =============================================================================
+# RITSEC SPICE Web Client — one-shot OKD / Kubernetes deployment
+#   domain:    spice.ritsec.cloud
+#   source:    https://github.com/ritsec/spice-web-client-modernized (public)
+#
+#   kubectl apply -f deploy/okd.yaml
+#   oc start-build spice-web-client -n spice                              # first build
+#   kubectl rollout restart deployment/spice-web-client -n spice         # after each rebuild
+#
+# Architecture
+#   BuildConfig (build.openshift.io/v1)  -- builds in-cluster from public git
+#     -> ImageStream spice-web-client:latest  (internal registry, no pre-push)
+#          -> Deployment (apps/v1, 2 replicas, stateless)
+#               -> Service :80  ->  Ingress spice.ritsec.cloud (edge TLS via cert-manager)
+#
+# Security
+#   * The default ServiceAccount is never used.
+#       - pod:    SA `spice-web-client`, scoped to system:image-puller only (serves static
+#                 files; the browser talks to the OpenStack websockify proxy itself).
+#       - build:  SA `spice-build`, scoped to system:image-pusher/puller only.
+#   * No OpenStack credentials / clouds.yaml are stored in the cluster.
+# =============================================================================
+
+# Namespace -------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spice
+  labels:
+    name: spice
+
+---
+# Pod SA: static file server, zero API access, token not mounted. -------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spice-web-client
+  namespace: spice
+
+---
+# Pod SA pull permission: scoped to pulling from the internal registry only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-web-client-image-puller
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: spice-web-client
+    namespace: spice
+
+---
+# Build SA: only what a Docker build needs (push result, pull base image). ----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spice-build
+  namespace: spice
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-build-image-pusher
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-pusher
+subjects:
+  - kind: ServiceAccount
+    name: spice-build
+    namespace: spice
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spice-build-image-puller
+  namespace: spice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    name: spice-build
+    namespace: spice
+
+---
+# ImageStream ------------------------------------------------------------------
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: spice-web-client
+  namespace: spice
+  labels:
+    app: spice-web-client
+spec:
+  tags:
+    - name: latest
+      referencePolicy:
+
+---
+# BuildConfig (build.openshift.io/v1) -----------------------------------------
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: spice-web-client
+  namespace: spice
+  labels:
+    app: spice-web-client
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/ritsec/spice-web-client-modernized
+      ref: add-unit-test
+      # If the repo goes private, create a token secret and uncomment:
+      #   oc create secret generic spice-git \
+      #     --from-literal=username=<gh-user> \
+      #     --from-literal=password=<personal-access-token> -n spice
+      # secrets:
+      #   - name: spice-git
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile.web
+  output:
+    to:
+      kind: ImageStreamTag
+      name: spice-web-client:latest
+  serviceAccountName: spice-build
+  triggers:
+    - type: ConfigChange
+
+---
+# Deployment (apps/v1) ----------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spice-web-client
+  namespace: spice
+  labels:
+    app: spice-web-client
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spice-web-client
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: spice-web-client
+    spec:
+      serviceAccountName: spice-web-client
+      containers:
+        - name: web
+          image: image-registry.openshift-image-registry.svc:5000/spice/spice-web-client:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+# Service -----------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: spice-web-client
+  namespace: spice
+  labels:
+    app: spice-web-client
+spec:
+  selector:
+    app: spice-web-client
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+
+---
+# Ingress -----------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spice-web-client
+  namespace: spice
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-http-prod
+    route.openshift.io/termination: "edge"
+    route.openshift.io/insecure-edge-termination-policy: Redirect
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - hosts:
+        - spice.ritsec.cloud
+      secretName: spice-tls
+  rules:
+    - host: spice.ritsec.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: spice-web-client
+                port:
+                  number: 80

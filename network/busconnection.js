@@ -60,9 +60,7 @@ wdi.BusConnection = $.spcExtend(wdi.EventObject.prototype, {
 			}];
 		}
 		this.clusterNodeChooser.setNodeList(c['busHostList']);
-		if (Modernizr['websocketsbinary']) {
-			this.binary = true;
-		}
+		this.binary = true;
 		this._busUser = c['busUser'];
 		this._busPass = c['busPass'];
 		this._websockifyProtocol = c['protocol'];

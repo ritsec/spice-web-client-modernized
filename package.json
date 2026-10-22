@@ -7,6 +7,8 @@
   "homepage": "http://www.eyeos.com",
   "scripts": {
     "test": "node tools/run-tests.mjs",
-    "serve": "node tools/serve.mjs"
+    "serve": "node tools/serve.mjs",
+    "build": "node tools/build.mjs",
+    "build:min": "node tools/build.mjs --minify"
   }
 }

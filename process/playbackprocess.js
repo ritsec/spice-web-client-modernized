@@ -28,22 +28,11 @@ wdi.PlaybackProcess = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	getAudioContext: function() {
-		//standard browser object
 		try {
 			return new AudioContext();
 		} catch(e) {
-
+			return null;
 		}
-
-		//chrome and safari
-		try {
-		   return new webkitAudioContext();
-
-		} catch(e) {
-
-		}
-
-		return false;
 	},
 
 	process: function(spiceMessage) {
@@ -186,19 +175,7 @@ wdi.PlaybackProcess = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	_play: function(source, audioBuffer, dataTimestamp) {
-    var currentTime = Date.now();
-    var maxSeconds = 9000; //9 secs
 		var wait = 0;
-
-    // Check if maxSeconds have elapsed since the last reset
-    // This is to avoid the audio sync constantly falling behind
-    // admittedly in a crude way.
-    if (currentTime - this._lastResetTime >= maxSeconds) {
-      console.log("x time has lasped since audio sync reset");
-      this.startTime = 0; // reset the startTime
-      this._lastResetTime = currentTime; // update the last reset time
-      console.log("_lastResetTime has been reset");
-    }
 
 		if (dataTimestamp) {
 			var elapsedTime = Date.now() - this.app.lastMultimediaTime; // time passed since we received the last multimedia time from main channel

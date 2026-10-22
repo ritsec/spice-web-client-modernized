@@ -379,6 +379,9 @@ Application = $.spcExtend(wdi.DomainObject, {
     },
 
 	disconnect: function() {
+		if (this.clientGui && this.clientGui.releaseAllKeys) {
+			this.clientGui.releaseAllKeys();
+		}
 		this.busConnection.disconnect();
 		this.spiceConnection.disconnect();
 	},

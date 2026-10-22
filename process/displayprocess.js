@@ -7,31 +7,37 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 		this.packetFilter = c.packetFilter || wdi.PacketFilter;
 		this.clientGui = c.clientGui;
 		this.displayRouter = c.displayRouter || new wdi.DisplayRouter({clientGui:this.clientGui});
-		this.started = false;
+		this.flushScheduled = false;
+		this.flushFrame = null;
+		this.flushTimer = null;
 		this.waitingMessages = [];
 		this.packetWorkerIdentifier = c.packetWorkerIdentifier || new wdi.PacketWorkerIdentifier();
 	},
 
+	// Messages that arrive before the next animation frame are drawn together,
+	// so draws covered by a later one in the same batch can be dropped. Hidden
+	// tabs don't run animation frames, so a timeout flushes there instead.
 	process: function(spiceMessage) {
-		//this._process(spiceMessage);
-		//disable requestanimationframe equivalent for the moment
-		//the remove redundant draws implementation is buggy
-		//and there are considerations on how it is implemented
-
-
-		var self = this;
 		this.waitingMessages.push(spiceMessage);
 
-		if(!this.started) {
-			this.timer = setInterval(function() {
+		if(!this.flushScheduled) {
+			this.flushScheduled = true;
+			var self = this;
+			var flush = function() {
 				self.flush();
-			}, 50);
-			this.started = true;
+			};
+			this.flushFrame = requestAnimationFrame(flush);
+			this.flushTimer = setTimeout(flush, 250);
 		}
-
 	},
 
 	flush: function() {
+		if(this.flushScheduled) {
+			this.flushScheduled = false;
+			cancelAnimationFrame(this.flushFrame);
+			clearTimeout(this.flushTimer);
+		}
+
 		if(this.waitingMessages.length === 0) {
 			return;
 		}
@@ -120,6 +126,13 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 
 		//itareate over messages marked for deletion and remove it from the array
 		for(x = 0;x < to_delete.length;x++) {
+			message = this.waitingMessages[to_delete[x]];
+			if (wdi.NetStats.enabled) {
+				wdi.NetStats.recordDropped(message);
+			}
+			if (message.ackToken) {
+				message.ackToken.send();
+			}
 			this.waitingMessages.splice(to_delete[x], 1);
 		}
 	},
@@ -164,7 +177,13 @@ wdi.DisplayProcess = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	processEnd: function(spiceMessage, clientGui) {
+		if (spiceMessage && spiceMessage.ackToken) {
+			spiceMessage.ackToken.send();
+		}
 		this.packetFilter.notifyEnd(spiceMessage, clientGui);
+		if (wdi.NetStats.enabled) {
+			wdi.NetStats.recordDrawDone(spiceMessage);
+		}
 	},
 
 	postProcess: function() {

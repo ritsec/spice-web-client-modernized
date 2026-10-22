@@ -186,6 +186,18 @@ wdi.SpiceConnection = $.spcExtend(wdi.EventObject.prototype, {
     processChannelMessage: function(params) {
         var packet = wdi.PacketFactory.extract(params); //returns domain object
 
+        if (params.channel === wdi.SpiceVars.SPICE_CHANNEL_DISPLAY) {
+            wdi.NetStats.recordDisplayMessage(params.header.type, params.header.size + wdi.SpiceDataHeader.prototype.objectSize, packet);
+        }
+
+        if (params.ackToken) {
+            if (packet) {
+                packet.ackToken = params.ackToken;
+            } else {
+                params.ackToken.send();
+            }
+        }
+
         //return ViewQueue to the pool, object is already decoded
         wdi.GlobalPool.discard('ViewQueue', params.body);
         wdi.GlobalPool.discard('RawSpiceMessage', params);
