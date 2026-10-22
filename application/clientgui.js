@@ -89,6 +89,24 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		this.initSound();
 		this.inputManager = c.inputManager || new wdi.InputManager({ stuckKeysHandler: this.stuckKeysHandler, window: $(window)});
 		this.inputManager.setCurrentWindow(window);
+		var self = this;
+		var releaseHeldKeys = function() {
+			if (self.stuckKeysHandler && self.stuckKeysHandler.releaseSpecialKeysPressed) {
+				self.stuckKeysHandler.releaseSpecialKeysPressed();
+			}
+		};
+		if (typeof window !== 'undefined' && window.addEventListener) {
+			window.addEventListener('blur', releaseHeldKeys);
+			window.addEventListener('pagehide', releaseHeldKeys);
+			window.addEventListener('beforeunload', releaseHeldKeys);
+		}
+		if (typeof document !== 'undefined' && document.addEventListener) {
+			document.addEventListener('visibilitychange', function() {
+				if (document.hidden) {
+					releaseHeldKeys();
+				}
+			});
+		}
 	},
 
 	setLayer: function(layer) {
@@ -338,6 +356,9 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	disableKeyboard: function() {
+		if (this.stuckKeysHandler && this.stuckKeysHandler.releaseSpecialKeysPressed) {
+			this.stuckKeysHandler.releaseSpecialKeysPressed();
+		}
 		var documentDOM = window.$(window.document);
 		documentDOM.unbind('keydown', this.handleKey);
 		documentDOM.unbind('keyup', this.handleKey);
@@ -686,12 +707,13 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	handleKey: function(e) {
-		console.log("Type: " + e.type + " key: " + e.key + " code: " + e.code);
+		var code = e.code || (e.originalEvent && e.originalEvent.code);
+		console.log("Type: " + e.type + " key: " + e.key + " code: " + code);
 		document.getElementById("inputmanager").focus();
-		// Ensure legacy keyCode is present (for synthetic/generated events and
-		// older browsers). Modern KeyboardEvent.code is the primary source.
-		if ((!e.keyCode || e.keyCode === 0) && e.code && wdi.Keymap.keyCodeFromCode) {
-			var derived = wdi.Keymap.keyCodeFromCode(e.code);
+		// Ensure legacy keyCode matches the physical KeyboardEvent.code table so
+		// StuckKeysHandler tracks and releases the exact key that was pressed.
+		if (code && wdi.Keymap && wdi.Keymap.keyCodeFromCode) {
+			var derived = wdi.Keymap.keyCodeFromCode(code);
 			if (derived !== undefined) e.keyCode = derived;
 		}
 		e.data[0].generateEvent.call(e.data[0], e.type, [e]);

@@ -171,6 +171,7 @@ wdi.Keymap = {
         "F9": 120, "F10": 121, "F11": 122, "F12": 123,
         "Home": 36,
         "Insert": 45,
+        "IntlBackslash": 226,
         "KeyA": 65, "KeyB": 66, "KeyC": 67, "KeyD": 68,
         "KeyE": 69, "KeyF": 70, "KeyG": 71, "KeyH": 72,
         "KeyI": 73, "KeyJ": 74, "KeyK": 75, "KeyL": 76,
@@ -182,6 +183,14 @@ wdi.Keymap = {
         "MetaRight": 93,
         "Minus": 189,
         "NumLock": 144,
+        "NumpadAdd": 107,
+        "NumpadDecimal": 110,
+        "NumpadDivide": 111,
+        "NumpadEnter": 13,
+        "NumpadMultiply": 106,
+        "NumpadSubtract": 109,
+        "OSLeft": 91,
+        "OSRight": 92,
         "PageDown": 34,
         "PageUp": 33,
         "Period": 190,
@@ -251,7 +260,7 @@ wdi.Keymap = {
     getScanCodes: function(e, omitCtrl, type) {
         if ('originalEvent' in e && 'code' in e.originalEvent) {
             code = e.originalEvent.code;
-            if (code != "" && code != 'Unidentified') {
+            if (code != "" && code != 'Unidentified' && this.defaultCodes[code]) {
                 console.log("Use KeyboardEvent.code = " + code + ", " + type);
                 // keydown already emitted the press for this physical key; a
                 // keypress event would emit the same scan code a second time,
@@ -265,6 +274,9 @@ wdi.Keymap = {
                 if (type != 'keydown' && type != 'keypress') {
                     if (scanCodes[0] == 0xE0) {
                         scanCodes[1] = scanCodes[1] | 0x80;
+                        if (scanCodes[2] == 0xE0) {
+                            scanCodes[3] = scanCodes[3] | 0x80;
+                        }
                     } else {
                         scanCodes[0] = scanCodes[0] | 0x80;
                     }
@@ -296,6 +308,8 @@ wdi.Keymap = {
             return scanCodes;
         } else if (this.handledByCharmap(e['type'])) {
             return this.getScanCodesFromCharCode(e['charCode']);
+        } else if (e['generated'] && type === 'keyup') {
+            return this.getReleaseScanCodesForKeyCode(e['keyCode']);
         } else if (this.handledByNormalKeyCode(type, e['keyCode'], e['generated'])) {
             additionalKeymap = { };
             additionalKeymap[76] = 0x26;
@@ -303,6 +317,34 @@ wdi.Keymap = {
         } else {
             return [];
         }
+    },
+
+    getReleaseScanCodesForKeyCode: function(keyCode) {
+        this.controlPressed(keyCode, 'keyup');
+        var result = [];
+        var seen = {};
+        for (var code in this.defaultCodes) {
+            if (this.defaultCodes.hasOwnProperty(code) && this.keyCodeFromCode(code) === keyCode) {
+                var scanCodes = this.defaultCodes[code].slice();
+                if (scanCodes[0] == 0xE0) {
+                    scanCodes[1] = scanCodes[1] | 0x80;
+                    if (scanCodes[2] == 0xE0) {
+                        scanCodes[3] = scanCodes[3] | 0x80;
+                    }
+                } else {
+                    scanCodes[0] = scanCodes[0] | 0x80;
+                }
+                var key = scanCodes.join(',');
+                if (!seen[key]) {
+                    seen[key] = true;
+                    result.push(scanCodes);
+                }
+            }
+        }
+        if (result.length === 0 && this.handledByNormalKeyCode('keyup', keyCode, true)) {
+            return this.getScanCodeFromKeyCode(keyCode, 'keyup', this.keymap, { 76: 0x26 });
+        }
+        return result;
     },
 
     getScanCodeFromKeyCode: function(keyCode, type, keymap, additionalKeymap) {

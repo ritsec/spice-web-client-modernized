@@ -116,5 +116,17 @@ suite("Keymap", function() {
 		test('does not resolve plain letters via the keyCode keymap', function () {
 			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 65 }, false, 'keydown'), []);
 		});
+		test('resolves generated keyup events across defaultCodes (letters, left/right modifiers)', function () {
+			assert.deepEqual(sut.getScanCodes({ type: 'keyup', keyCode: 65, generated: true }, false, 'keyup'), [[0x1E | 0x80, 0, 0, 0]]);
+			assert.deepEqual(sut.getScanCodes({ type: 'keyup', keyCode: 87, generated: true }, false, 'keyup'), [[0x11 | 0x80, 0, 0, 0]]);
+			assert.deepEqual(sut.getScanCodes({ type: 'keyup', keyCode: 16, generated: true }, false, 'keyup'), [
+				[0x2A | 0x80, 0, 0, 0],
+				[0x36 | 0x80, 0, 0, 0]
+			]);
+			assert.deepEqual(sut.getScanCodes({ type: 'keyup', keyCode: 18, generated: true }, false, 'keyup'), [
+				[0x38 | 0x80, 0, 0, 0],
+				[0xE0, 0x38 | 0x80, 0, 0]
+			]);
+		});
 	});
 });
