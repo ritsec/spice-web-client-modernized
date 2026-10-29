@@ -69,6 +69,10 @@ function translate() {
 function start () {
 	var testSessionStarted = false;
 
+	if (getURLParameter('netstats')) {
+		wdi.NetStats.start();
+	}
+
 	translate();
 
 	$('#getStats').click(function() {
@@ -158,7 +162,16 @@ function start () {
 				$('#launchWordButton').prop('disabled', false);
 			}
 		} else if (action == 'resolution') {
-
+			// Echo the actual rendering surface back to the agent
+			// to force the hypervisor's mouse tablet bounds to 1:1 sync
+			if (window.lastSyncedWidth !== params[0] || window.lastSyncedHeight !== params[1]) {
+			window.lastSyncedWidth = params[0];
+			window.lastSyncedHeight = params[1];
+			app.sendCommand('setResolution', {
+				'width': params[0],
+				'height': params[1]
+			});
+			}
 		} else if (action == 'windowMinimized') {
 			//in eyeos, this should minimize the window, not close it
 			$(params.canvas).css({'display': 'none'});
@@ -228,10 +241,20 @@ function start () {
 				height -= 40;
 			}
 		}
+		// Prevent QXL 16MB VRAM exhaustion by capping pixels
+		var maxPixels = 2500000; // ~10MB at 32bpp
+		if (width * height > maxPixels) {
+			var ratio = Math.sqrt(maxPixels / (width * height));
+			width = Math.floor(width * ratio);
+			height = Math.floor(height * ratio);
+		}
 		app.sendCommand('setResolution', {
 			'width': width,
 			'height': height
 		});
+		if (app.clientGui) {
+			app.clientGui.resizeCanvasToFit();
+		}
 	});
 
 	var useWorkers = true;
@@ -265,30 +288,24 @@ function start () {
 	app.run({
 		'callback': f,
 		'context': this,
-		'host': data['spice_address'] || '',
-		'port': data['spice_port'] || 0,
-		'protocol': getURLParameter('protocol') || 'ws',
-		'token': data['spice_password'] || '',
+		'host': getURLParameter('host') || 'stack.ritsec.cloud',
+		'port': parseInt(getURLParameter('port') || '6082', 10),
+		'protocol': getURLParameter('protocol') || 'wss',
+		'token': data['spice_password'] || getURLParameter('token') || '',
 		'vmHost': getURLParameter('vmhost') || false,
 		'vmPort': getURLParameter('vmport') || false,
 		'useBus': false,
-		'busHost': '10.11.12.200',
-		'busPort': 61613,
-		'busSubscriptions': ['/topic/00000000-0000-0000-0000-000000000000'],
-		'busUser': '00000000-0000-0000-0000-000000000000',
-		'busPass': 'potato',
         // Connection Control
 		'connectionControl': false,
         'heartbeatToken': 'heartbeat',
 		'heartbeatTimeout': 4000,//miliseconds
-		'busFileServerBaseUrl': 'https://10.11.12.200/fileserver/',
 		'layout': data['layout'] || 'es',
 		'useWorkers': useWorkers,
 		'seamlessDesktopIntegration': false,
 		'externalClipboardHandling': false,
-		'disableClipboard': true,
+		'disableClipboard': false,
 		'layer': document.getElementById('screen'),
-		'vmInfoToken': getURLParameter('vmInfoToken'),
+		'vmInfoToken': getURLParameter('vmInfoToken') || getURLParameter('token'),
 		'canvasMargin': {
 			'x': 0,
 			'y': 40
@@ -310,6 +327,31 @@ function closeIntegrationBenchmark () {
 }
 
 $(document).ready(() => {
+  // Shared boot steps: elicit clipboard-read permission, clear the Start gate, start.
+  function boot() {
+    requestClipboardPermission();
+    $('#soundButtonContainer').remove();
+    start();
+  }
+
+  if (getURLParameter('autostart') === 'true') {
+    // ?autostart=true: skip the Start gate and boot immediately. No user gesture is
+    // available, so any AudioContext starts suspended (resume on first interaction)
+    // and the clipboard-read prompt is deferred to first use. AudioContext creation
+    // is guarded so a headless/automation context without an audio backend still boots.
+    console.log('autostart=true -- skipping the Start gate');
+    try { audioContext = new AudioContext(); } catch (e) { audioContext = null; }
+    if (audioContext) {
+      var resume = function () { if (audioContext.state === 'suspended') { audioContext.resume(); } };
+      document.addEventListener('pointerdown', resume, { once: true });
+      document.addEventListener('keydown', resume, { once: true });
+    }
+    boot();
+    return;
+  }
+
+  // Default: the Start click is the user gesture that lets audio start running and
+  // lets us surface the clipboard-read prompt.
   var $button = $('<button>Start</button>', {id: "startAudio"}).css({
     padding: "10px 25px",
     fontSize: "25px",
@@ -319,9 +361,7 @@ $(document).ready(() => {
   }).click(function() {
       console.log("Creating new AudioContext from user gesture");
       audioContext = new AudioContext();
-      $('#soundButtonContainer').remove();
-      console.log("Starting application");
-      start();
+      boot();
     });
 
   var $messageContainer = $('<div id="messageContainer"><p>Click to start using your virtual session:</p></div>').css({

@@ -116,7 +116,12 @@ wdi.InputProcess = $.spcExtend(wdi.EventObject.prototype, {
 			}
 		} else if (type == 'keyup') {
 			scanCodes = wdi.Keymap.getScanCodes(data[1][0], this.altGrCombo, type);
-			if (scanCodes.length == 1 && scanCodes[0][0] == 184) {
+			if (data[1][0] && data[1][0]['generated']) {
+				this.pendingAltKey = false;
+				this.pendingCtrlKey = false;
+				this.altGrCombo = false;
+			}
+			if (scanCodes.length == 1 && !data[1][0]['generated'] && scanCodes[0][0] == 184) {
 				if (this.pendingAltKey) {
 					console.log("INPUTS_KEY_UP: sending pending Alt key");
 					packet = new wdi.SpiceMessage({
@@ -131,7 +136,7 @@ wdi.InputProcess = $.spcExtend(wdi.EventObject.prototype, {
 					return;
 				}
 			}
-			if (scanCodes.length == 1 && scanCodes[0][0] == 224 && scanCodes[0][1] == 157) {
+			if (scanCodes.length == 1 && !data[1][0]['generated'] && scanCodes[0][0] == 224 && scanCodes[0][1] == 157) {
 				if (this.pendingCtrlKey) {
 					console.log("INPUTS_KEY_UP: sending pending Ctrl key");
 					packet = new wdi.SpiceMessage({

@@ -79,5 +79,51 @@ suite('SpiceConnection', function() {
 		});
 	});
 
+	suite('#processChannelMessage()', function() {
+		setup(function() {
+			this.sut = new wdi.SpiceConnection({
+				connectionControl: {
+					connect: function() {},
+					addListener: function() {}
+				}
+			});
+			this.packet = {args: {}};
+			this.extract = sinon.stub(wdi.PacketFactory, 'extract').returns(this.packet);
+			this.discard = sinon.stub(wdi.GlobalPool, 'discard');
+			this.record = sinon.stub(wdi.NetStats, 'recordDisplayMessage');
+		});
+
+		teardown(function() {
+			this.extract.restore();
+			this.discard.restore();
+			this.record.restore();
+		});
+
+		test('Should pass display message type, size with header and packet to NetStats', function() {
+			var type = wdi.SpiceVars.SPICE_MSG_DISPLAY_DRAW_COPY;
+			this.sut.processChannelMessage({channel: wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, header: {type: type, size: 100}, body: {}});
+			assert.isTrue(this.record.calledWithExactly(type, 106, this.packet));
+		});
+
+		test('Should move the ACK token to the decoded packet', function() {
+			var token = {send: sinon.spy()};
+			this.sut.processChannelMessage({channel: wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, header: {type: 102, size: 0}, body: {}, ackToken: token});
+			assert.equal(this.packet.ackToken, token);
+			assert.isFalse(token.send.called);
+		});
+
+		test('Should send the ACK right away when the message cannot be decoded', function() {
+			this.extract.returns(false);
+			var token = {send: sinon.spy()};
+			this.sut.processChannelMessage({channel: wdi.SpiceVars.SPICE_CHANNEL_DISPLAY, header: {type: 999, size: 0}, body: {}, ackToken: token});
+			assert.isTrue(token.send.calledOnce);
+		});
+
+		test('Should not pass other channels to NetStats', function() {
+			this.sut.processChannelMessage({channel: wdi.SpiceVars.SPICE_CHANNEL_CURSOR, header: {type: 101, size: 100}, body: {}});
+			assert.isFalse(this.record.called);
+		});
+	});
+
 });
 	

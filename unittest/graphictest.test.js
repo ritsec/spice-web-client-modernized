@@ -36,8 +36,6 @@ suite('GraphicTest', function() {
 	}
 
 	teardown(function() {
-		clearInterval(displayPreProcess.displayProcess.timer);
-		displayPreProcess.displayProcess.started = false;
 		displayPreProcess.displayProcess.waitingMessages.length = 0;
 		resetSharedDisplayState();
 	});

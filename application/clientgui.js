@@ -49,6 +49,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	triedCapturingPointer: false,
 	mouse_status: 0,
 	eventLayer: null,
+	clientCursorVisible: false,
 	counter: 0,
 	mainCanvas: 0,
 	firstTime: true,
@@ -88,6 +89,24 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		this.initSound();
 		this.inputManager = c.inputManager || new wdi.InputManager({ stuckKeysHandler: this.stuckKeysHandler, window: $(window)});
 		this.inputManager.setCurrentWindow(window);
+		var self = this;
+		var releaseHeldKeys = function() {
+			if (self.stuckKeysHandler && self.stuckKeysHandler.releaseSpecialKeysPressed) {
+				self.stuckKeysHandler.releaseSpecialKeysPressed();
+			}
+		};
+		if (typeof window !== 'undefined' && window.addEventListener) {
+			window.addEventListener('blur', releaseHeldKeys);
+			window.addEventListener('pagehide', releaseHeldKeys);
+			window.addEventListener('beforeunload', releaseHeldKeys);
+		}
+		if (typeof document !== 'undefined' && document.addEventListener) {
+			document.addEventListener('visibilitychange', function() {
+				if (document.hidden) {
+					releaseHeldKeys();
+				}
+			});
+		}
 	},
 
 	setLayer: function(layer) {
@@ -118,7 +137,9 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	},
 
 	checkFeatures: function() {
-		if (!Modernizr.canvas || !Modernizr.websockets) {
+		var hasCanvas = !!(document.createElement('canvas').getContext);
+		var hasWebSockets = (typeof WebSocket !== 'undefined');
+		if (!hasCanvas || !hasWebSockets) {
 			alert('Your Browser is not compatible with WDI. Visit ... for a list of compatible browsers');
 			return false;
 		}
@@ -256,6 +277,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		var surface = spiceMessage.args;
 		if (surface.surface_id === this.mainCanvas) {
 			$(this.eventLayer).remove();
+			$('#eventLayerWrapper').remove(); // Destroy the orphaned wrapper
 			this.eventLayer = null;
 		}
 
@@ -267,68 +289,76 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 	drawCanvas: function(spiceMessage) {
 		var surface = spiceMessage.args;
 		var cnv = wdi.GlobalPool.create('Canvas');
-		cnv.keepAlive = true; //prevent this canvas to return to the pool by packetfilter
-
+		cnv.keepAlive = true; 
+		
 		cnv.id = 'canvas_' + surface.surface_id;
 		cnv.width = surface.width;
 		cnv.height = surface.height;
 		cnv.style.display = 'block';
-		cnv.style.margin = 'auto';
-		cnv.style["margin-top"] = this.canvasMarginY + 'px';
+		cnv.style.position = 'absolute';
+		cnv.style.top = '0';
+		cnv.style.left = '0';
+		cnv.style.width = '100%';
+		cnv.style.height = '100%';
 		cnv.style.zIndex = '0';
-
+		
 		this.canvas[surface.surface_id] = cnv;
 		this.contexts[surface.surface_id] = cnv.getContext('2d');
-
+		
 		if (surface.flags && !wdi.SeamlessIntegration) {
-			this.mainCanvas = surface.surface_id;
-
-			this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
-			this.updateMousePointer()
-
-			var evLayer = $(this.eventLayer).css({
-				display: 'block',
-				margin: 'auto',
-				'margin-top': this.canvasMarginY + 'px'
-			})[0];
-
-			var evLayerWrapper = $('<div id="eventLayerWrapper"></div>').css({
-				position: 'absolute',
-				top: '0',
-			    width: '100%',
-			    height: '100%',
-			    zIndex: '0'
-			})[0];
-			evLayerWrapper.appendChild(evLayer);
-
-			if(this.layer) {
-				this.layer.appendChild(cnv);
-				this.layer.appendChild(evLayerWrapper);
-			} else {
-				document.body.appendChild(cnv);
-				document.body.appendChild(evLayerWrapper);
-			}
-
-			//this.enableKeyboard();
+		this.mainCanvas = surface.surface_id;
+		
+		this.eventLayer = this.createEventLayer('eventLayer', surface.width, surface.height);
+		this.updateMousePointer();
+		
+		var evLayer = $(this.eventLayer).css({
+		display: 'block',
+		position: 'absolute',
+		top: '0',
+		left: '0',
+		width: '100%',
+		height: '100%',
+		zIndex: '1'
+		})[0];
+		
+		if(this.layer) {
+		// Apply dimensions and centering to the parent #screen div
+		$(this.layer).css({
+			position: 'relative',
+			margin: '0 auto',
+			marginTop: this.canvasMarginY + 'px',
+			width: surface.width + 'px',
+			height: surface.height + 'px'
+		});
+		this.layer.appendChild(cnv);
+		this.layer.appendChild(evLayer);
+		} else {
+		document.body.appendChild(cnv);
+		document.body.appendChild(evLayer);
 		}
-
-		//this goes here?
+		
+		// Auto-scale immediately on first load
+		this.resizeCanvasToFit();
+		}
+		
 		if (this.firstTime && this.clipboardEnabled) {
-			var self = this;
-			$(document).bind('paste', function(event) {
-				self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
-			});
-			this.firstTime = false;
+		var self = this;
+		$(document).bind('paste', function(event) {
+		self.fire('paste', event.originalEvent.clipboardData.getData('text/plain'));
+		});
+		this.firstTime = false;
 		}
-
-
-		//notify about resolution
+		
 		if (surface.flags) {
-			this.fire('resolution', [this.canvas[surface.surface_id].width, this.canvas[surface.surface_id].height]);
-		}
+		this.fire('resolution', [this.canvas[surface.surface_id].width, this.canvas[surface.surface_id].height]);
+		}	
+
 	},
 
 	disableKeyboard: function() {
+		if (this.stuckKeysHandler && this.stuckKeysHandler.releaseSpecialKeysPressed) {
+			this.stuckKeysHandler.releaseSpecialKeysPressed();
+		}
 		var documentDOM = window.$(window.document);
 		documentDOM.unbind('keydown', this.handleKey);
 		documentDOM.unbind('keyup', this.handleKey);
@@ -350,6 +380,22 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		this.canvasMarginY = canvasMargin.y;
 		$('#screen canvas').css({ 'margin-top': this.canvasMarginY + 'px' });
 	},
+	resizeCanvasToFit: function() {
+		if (this.mainCanvas === null || !this.canvas[this.mainCanvas] || !this.eventLayer) return;
+		var cnv = this.canvas[this.mainCanvas];
+		
+		var winWidth = window.innerWidth;
+		var winHeight = window.innerHeight - this.canvasMarginY;
+		
+		var scale = Math.min(winWidth / cnv.width, winHeight / cnv.height);
+		var newWidth = Math.round(cnv.width * scale);
+		var newHeight = Math.round(cnv.height * scale);
+		
+		$(this.layer).css({
+			width: newWidth + 'px',
+			height: newHeight + 'px'
+		});
+	},
 
 	createEventLayer: function(event_id, width, height) {
 		var self = this;
@@ -362,18 +408,14 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				height: height
 			});
 
-		if (window['bowser']['firefox']) {
-			eventLayer.attr('contentEditable', true);
-		}
-
-		eventLayer.requestPointerLock = eventLayer.requestPointerLock || eventLayer.mozRequestPointerLock;
-		document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
+// Potentially related to a firefox-specific cursor issue?
+//		if (window['bowser']['firefox']) {
+//			eventLayer.attr('contentEditable', true);
+//		}
 
 		if ("onpointerlockchange" in document) {
 			document.addEventListener('pointerlockchange', lockChangeAlert, false);
-		  } else if ("onmozpointerlockchange" in document) {
-			document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
-		  }
+		}
 
 		eventLayer.bind('touchstart', function(event) {
 			event.preventDefault();
@@ -521,7 +563,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 				self.mouse_status = 1;
 
 
-				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
+				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER && !self.clientCursorVisible) {
 					this.triedCapturingPointer = true;
 					app.clientGui.capturePointer();
 				}
@@ -529,36 +571,36 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 			});
 
 			eventLayer['mousemove'](function(event) {
-				var x = event.pageX;
-				var y = event.pageY;
-				var offset = $(this).offset();
-				if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
-					self.generateEvent.call(self, 'mousemove', [x - offset.left, y - offset.top, self.mouse_status, self.mouse_mode]);
-				} else if (this.triedCapturingPointer) {
-					var e = event.originalEvent;
-					var dx = e.movementX  ||
-						e.mozMovementX    ||
-						e.webkitMovementX ||
-						0;
-					var dy = e.movementY  ||
-						e.mozMovementY    ||
-						e.webkitMovementY ||
-						0;
-					// Sometimes mousemove events with dx == dy == 0 are generated.
-					// For instance mouse click in chrome/windows.
-					if (!dx && !dy
-						&& typeof e.movementX == 'undefined'
-						&& typeof e.mozMovementX == 'undefined'
-						&& typeof e.webkitMovementY == 'undefined'
-					) {
-						dx = x - offset.left - wdi.VirtualMouse.lastMousePosition.x;
-						dy = y - offset.top - wdi.VirtualMouse.lastMousePosition.y;
-					}
-					self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, self.mouse_mode]);
-				}
-				event.preventDefault();
+			var e = event.originalEvent;
+			var rect = this.getBoundingClientRect();
+			
+			// Use floating-point rect dimensions for perfect scale math
+			var scaleX = this.width / rect.width;
+			var scaleY = this.height / rect.height;
+			
+			// Native offsetX/Y cleanly bypasses getBoundingClientRect layout bugs in Firefox.
+			// Fallbacks included just in case.
+			var offX = e.offsetX !== undefined ? e.offsetX : (event.clientX - rect.left);
+			var offY = e.offsetY !== undefined ? e.offsetY : (event.clientY - rect.top);
+			
+			var ax = Math.round(offX * scaleX);
+			var ay = Math.round(offY * scaleY);
+			
+			if (self.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+			self.generateEvent.call(self, 'mousemove', [ax, ay, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT]);
+			} else if (self.clientCursorVisible || this.triedCapturingPointer) {
+			var dx, dy;
+			if (this.triedCapturingPointer && typeof e.movementX != 'undefined' && (e.movementX || e.movementY)) {
+				dx = e.movementX  || e.mozMovementX    || e.webkitMovementX || 0;
+				dy = e.movementY  || e.mozMovementY    || e.webkitMovementY || 0;
+			} else {
+				dx = ax - wdi.VirtualMouse.lastMousePosition.x;
+				dy = ay - wdi.VirtualMouse.lastMousePosition.y;
+			}
+			self.generateEvent.call(self, 'mousemove', [dx, dy, self.mouse_status, wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER]);
+			}
+			event.preventDefault()
 			});
-
 			eventLayer.bind('contextmenu', function(event) {
 				event.preventDefault();
 				return false;
@@ -628,7 +670,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	setMouseMode: function(mode) {
 		this.mouse_mode = mode;
-		if (mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER) {
+		if (mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_SERVER && !this.clientCursorVisible) {
 			this.triedCapturingPointer = false;
 			$.nok({
 				message: tr['msg_click_to_capture']
@@ -639,7 +681,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	updateMousePointer: function() {
 		if(this.eventLayer != null) {
-			if(this.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
+			if(this.clientCursorVisible || this.mouse_mode == wdi.SpiceMouseModeTypes.SPICE_MOUSE_MODE_CLIENT) {
 				console.log("Setting cursor to default")
 				$(this.eventLayer).css('cursor', 'default');
 				this.releasePointer();
@@ -650,24 +692,68 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 		}
 	},
 
+	setClientCursorVisible: function(visible) {
+		this.clientCursorVisible = visible;
+		if (visible) {
+			// show a visible cursor and skip pointer capture while the fallback is active
+			this.triedCapturingPointer = false;
+		}
+		this.updateMousePointer();
+	},
+
+	toggleClientCursor: function() {
+		this.setClientCursorVisible(!this.clientCursorVisible);
+		return this.clientCursorVisible;
+	},
+
 	handleKey: function(e) {
-		console.log("Type: " + e.type + " keyCode: " + e.keyCode + " charCode: " + e.charCode);
+		var code = e.code || (e.originalEvent && e.originalEvent.code);
+		console.log("Type: " + e.type + " key: " + e.key + " code: " + code);
 		document.getElementById("inputmanager").focus();
+		// Ensure legacy keyCode matches the physical KeyboardEvent.code table so
+		// StuckKeysHandler tracks and releases the exact key that was pressed.
+		if (code && wdi.Keymap && wdi.Keymap.keyCodeFromCode) {
+			var derived = wdi.Keymap.keyCodeFromCode(code);
+			if (derived !== undefined) e.keyCode = derived;
+		}
 		e.data[0].generateEvent.call(e.data[0], e.type, [e]);
+// seems unnecessary
+//		// Ctrl+V: pull the host clipboard into the VM. The DOM paste event is
+//		// unreliable here (no focused editable element), so read it directly.
+//		if (e.type === 'keydown' && e.ctrlKey && !e.altKey && e.keyCode === 86) {
+//			this.copyFromHost();
+//		}
 
 		if ((e.ctrlKey && !e.altKey) ||
 		    (wdi.Keymap.isInKeymap(e.keyCode) && e.type !== "keypress")) {
 			e.preventDefault();
 		}
-		//e.data[0].stuckKeysHandler.handleStuckKeys(e);
 	},
 
 	setClipBoardData: function(data) {
-		//we have received new clipboard data
-		//show to the user
-		//TODO: create a new dialog with buttons to copy the data directly
-		//from the textbox
-		prompt("New clipboard data available, press ctrl+c to copy it", data);
+		//we have received new clipboard data from the guest
+		//write it to the host clipboard (non-blocking)
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(data).catch(function(err) {
+				console.warn('Failed to write to host clipboard:', err);
+			});
+		}
+		this.fire('clipboardCopied', data);
+	},
+
+	// Host → guest: read the host clipboard (needs a user gesture + permission)
+	// and send it into the VM. Triggered by the "Paste in VM (Ctrl+V)" button or Ctrl+V.
+	copyFromHost: function() {
+		var self = this;
+		if (navigator.clipboard && navigator.clipboard.readText) {
+			navigator.clipboard.readText().then(function(text) {
+				if (text) {
+					self.fire('paste', text);
+				}
+			}).catch(function(err) {
+				console.warn('Failed to read host clipboard:', err);
+			});
+		}
 	},
 
 	initSound: function() {
@@ -724,8 +810,7 @@ wdi.ClientGui = $.spcExtend(wdi.EventObject.prototype, {
 
 	capturePointer() {
 		if (!document.pointerLockElement
-			&& !document.mozPointerLockElement
-			&& typeof this.eventLayer.requestPointerLock === "function") {
+						&& typeof this.eventLayer.requestPointerLock === "function") {
 			this.eventLayer.requestPointerLock();
 		}
 	}

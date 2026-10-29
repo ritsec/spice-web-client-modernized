@@ -188,5 +188,16 @@ suite('StuckKeysHandler:', function () {
 			assert.isFalse(sut.altKeyPressed);
 		});
 
+		test('releases non-modifier keys held down across keypress and clears them', sinon.test(function () {
+			sut.checkSpecialKey('keydown', 87);
+			sut.checkSpecialKey('keypress', 87);
+			this.mock(sut)
+				.expects('fire')
+				.once()
+				.withExactArgs('inputStuck', [ keyupEvent, [ createKeyupEvent(87) ] ]);
+			sut.releaseSpecialKeysPressed();
+			assert.deepEqual(sut.pressedKeys, {});
+		}));
+
 	});
 });

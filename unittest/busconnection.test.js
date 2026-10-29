@@ -60,7 +60,7 @@ suite('BusConnection', function() {
 			.expects('connect')
 			.once()
 			.withExactArgs(
-				'ws://' + config.host + ':' + document.location.port + '/?ver=2&token=' + config.port,
+				'ws://' + config.host + ':' + config.port + '/websockify',
 				'binary'
 			);
 
@@ -75,7 +75,7 @@ suite('BusConnection', function() {
 			.expects('connect')
 			.once()
 			.withExactArgs(
-				'ws://' + config.host + ':' + document.location.port + '/?ver=2&token=' + config.port,
+				'ws://' + config.host + ':' + config.port + '/websockify',
 				'binary'
 			);
 
