@@ -299,7 +299,7 @@ function start () {
 		'connectionControl': false,
         'heartbeatToken': 'heartbeat',
 		'heartbeatTimeout': 4000,//miliseconds
-		'layout': data['layout'] || 'es',
+		'layout': data['layout'] || 'en',
 		'useWorkers': useWorkers,
 		'seamlessDesktopIntegration': false,
 		'externalClipboardHandling': false,
