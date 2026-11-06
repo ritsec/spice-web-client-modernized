@@ -310,6 +310,13 @@ wdi.Keymap = {
             return this.getScanCodesFromCharCode(e['charCode']);
         } else if (e['generated'] && type === 'keyup') {
             return this.getReleaseScanCodesForKeyCode(e['keyCode']);
+        } else if (e['generated'] && type === 'keydown') {
+            // generated keydowns (send-keystroke buttons, programmatic Ctrl+V)
+            // must resolve like generated keyups: through defaultCodes. The
+            // legacy layout tables are incomplete (keymapUS has no Alt entry),
+            // so falling through to them silently drops keys - e.g. the Alt in
+            // Ctrl+Alt+Del was never sent, so guests never saw the combo.
+            return this.getPressScanCodesForKeyCode(e['keyCode']);
         } else if (this.handledByNormalKeyCode(type, e['keyCode'], e['generated'])) {
             additionalKeymap = { };
             additionalKeymap[76] = 0x26;
@@ -317,6 +324,26 @@ wdi.Keymap = {
         } else {
             return [];
         }
+    },
+
+    getPressScanCodesForKeyCode: function(keyCode) {
+        this.controlPressed(keyCode, 'keydown');
+        var result = [];
+        var seen = {};
+        for (var code in this.defaultCodes) {
+            if (this.defaultCodes.hasOwnProperty(code) && this.keyCodeFromCode(code) === keyCode) {
+                var scanCodes = this.defaultCodes[code].slice();
+                var key = scanCodes.join(',');
+                if (!seen[key]) {
+                    seen[key] = true;
+                    result.push(scanCodes);
+                }
+            }
+        }
+        if (result.length === 0 && this.handledByNormalKeyCode('keydown', keyCode, true)) {
+            return this.getScanCodeFromKeyCode(keyCode, 'keydown', this.keymap, { 76: 0x26 });
+        }
+        return result;
     },
 
     getReleaseScanCodesForKeyCode: function(keyCode) {

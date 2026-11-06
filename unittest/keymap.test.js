@@ -97,15 +97,18 @@ suite("Keymap", function() {
 				keymap: sut.keymap,
 				ctrlKeymap: sut.ctrlKeymap,
 				reservedCtrlKeymap: sut.reservedCtrlKeymap,
-				charmap: sut.charmap
+				charmap: sut.charmap,
+				ctrlPressed: sut.ctrlPressed
 			};
 			sut.loadKeyMap('en');
+			sut.ctrlPressed = false;
 		});
 		teardown(function () {
 			sut.keymap = saved.keymap;
 			sut.ctrlKeymap = saved.ctrlKeymap;
 			sut.reservedCtrlKeymap = saved.reservedCtrlKeymap;
 			sut.charmap = saved.charmap;
+			sut.ctrlPressed = saved.ctrlPressed;
 		});
 		test('resolves Enter (keyCode 13) through the loaded US keymap', function () {
 			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 13 }, false, 'keydown'), [[0xE0, 0x1C, 0, 0]]);
@@ -127,6 +130,61 @@ suite("Keymap", function() {
 				[0x38 | 0x80, 0, 0, 0],
 				[0xE0, 0x38 | 0x80, 0, 0]
 			]);
+		});
+		test('resolves generated Alt (keyCode 18) keydown even though keymapUS has no Alt entry', function () {
+			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 18, generated: true }, false, 'keydown'), [
+				[0x38, 0, 0, 0],
+				[0xE0, 0x38, 0, 0]
+			]);
+		});
+		test('resolves every key of the generated Ctrl+Alt+Del sequence in the US layout', function () {
+			var sent = [17, 18, 46].map(function (keyCode) {
+				return sut.getScanCodes({ type: 'keydown', keyCode: keyCode, generated: true }, false, 'keydown');
+			});
+			assert.lengthOf(sent, 3);
+			for (var i = 0; i < sent.length; i++) {
+				assert.isAbove(sent[i].length, 0, 'Ctrl+Alt+Del key #' + i + ' resolved to no scan codes');
+			}
+			assert.deepEqual(sent[2], [[0xE0, 0x53, 0, 0]]);
+		});
+		test('resolves generated Win (keyCode 91) as Meta, not as the US keymap Ctrl binding', function () {
+			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 91, generated: true }, false, 'keydown'), [[0xE0, 0x5B, 0, 0]]);
+		});
+		test('resolves generated Alt+Tab and Win+L sequences in the US layout', function () {
+			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 9, generated: true }, false, 'keydown'), [[0x0F, 0, 0, 0]]);
+			assert.deepEqual(sut.getScanCodes({ type: 'keydown', keyCode: 76, generated: true }, false, 'keydown'), [[0x26, 0, 0, 0]]);
+		});
+	});
+
+	suite('#getScanCodes (generated keydowns, es layout)', function () {
+		var saved;
+		setup(function () {
+			saved = {
+				keymap: sut.keymap,
+				ctrlKeymap: sut.ctrlKeymap,
+				reservedCtrlKeymap: sut.reservedCtrlKeymap,
+				charmap: sut.charmap,
+			ctrlPressed: sut.ctrlPressed
+			};
+			sut.loadKeyMap('es');
+			sut.ctrlPressed = false;
+		});
+		teardown(function () {
+			sut.keymap = saved.keymap;
+			sut.ctrlKeymap = saved.ctrlKeymap;
+			sut.reservedCtrlKeymap = saved.reservedCtrlKeymap;
+			sut.charmap = saved.charmap;
+			sut.ctrlPressed = saved.ctrlPressed;
+		});
+		test('still resolves the generated Ctrl+Alt+Del sequence', function () {
+			var sent = [17, 18, 46].map(function (keyCode) {
+				return sut.getScanCodes({ type: 'keydown', keyCode: keyCode, generated: true }, false, 'keydown');
+			});
+			for (var i = 0; i < sent.length; i++) {
+				assert.isAbove(sent[i].length, 0, 'es layout: Ctrl+Alt+Del key #' + i + ' resolved to no scan codes');
+			}
+			assert.deepEqual(sent[1], [[0x38, 0, 0, 0], [0xE0, 0x38, 0, 0]]);
+			assert.deepEqual(sent[2], [[0xE0, 0x53, 0, 0]]);
 		});
 	});
 });
